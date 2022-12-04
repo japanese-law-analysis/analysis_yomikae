@@ -25,13 +25,13 @@ pub enum YomikaeError {
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct YomikaeInfo {
   /// 法律番号
-  num: String,
+  pub num: String,
   /// その読み替え規定がある条項
-  chapter: Chapter,
+  pub chapter: Chapter,
   /// 読み替えられる前の単語
-  before_words: Vec<String>,
+  pub before_words: Vec<String>,
   /// 読み替えられた後の単語
-  after_word: String,
+  pub after_word: String,
 }
 
 /// 読み替え規定文は
