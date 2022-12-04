@@ -1,10 +1,8 @@
 use anyhow::{Context, Result};
 use clap::Parser;
-use jplaw_text::{ArticleTargetInfo, LawText};
-use listup_law;
+use jplaw_text::ArticleTargetInfo;
 use quick_xml::Reader;
 use search_article_with_word::{self, Chapter};
-use serde::Serialize;
 use std::collections::HashMap;
 use std::path::Path;
 use tokio::{
@@ -14,7 +12,6 @@ use tokio::{
 };
 use tokio_stream::StreamExt;
 use tracing::*;
-use tracing_subscriber;
 
 mod analysis;
 
@@ -39,13 +36,6 @@ struct Args {
   /// 解析する対象の条文のインデックスが書かれたJSONファイルへのpath
   #[clap(short, long, default_value_t = String::from("/usr/lib/x86_64-linux-gnu/mecab/dic/mecab-ipadic-neologd"))]
   mecab_ipadic: String,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
-struct ErrorInfo {
-  num: String,
-  chapter: Chapter,
-  contents: LawText,
 }
 
 async fn init_logger() -> Result<()> {
@@ -81,6 +71,7 @@ async fn main() -> Result<()> {
 
   let work_dir_path = Path::new(&args.work);
 
+  let mut error_lst = Vec::new();
   let mut error_output_file = File::create(&args.error_output).await?;
   info!("[START] write error output file");
   error_output_file.write_all("[".as_bytes()).await?;
@@ -126,21 +117,22 @@ async fn main() -> Result<()> {
               }
             }
           }
-          Err(_) => {
-            let error = ErrorInfo {
-              num: num.clone(),
-              chapter: chapter.clone(),
-              contents: law_text.clone(),
+          Err(err) => {
+            error!("{err}");
+            let mut error_stream = tokio_stream::iter(&error_lst);
+            let is_err_exist = error_stream.any(|e| e == &err).await;
+            if !is_err_exist {
+              error_lst.push(err.clone());
+              if is_error_head {
+                error_output_file.write_all("\n".as_bytes()).await?;
+                is_error_head = false;
+              } else {
+                error_output_file.write_all(",\n".as_bytes()).await?;
+              };
+              error_output_file
+                .write_all(serde_json::to_string(&err)?.as_bytes())
+                .await?;
             };
-            if is_error_head {
-              error_output_file.write_all("\n".as_bytes()).await?;
-              is_error_head = false;
-            } else {
-              error_output_file.write_all(",\n".as_bytes()).await?;
-            };
-            error_output_file
-              .write_all(serde_json::to_string(&error)?.as_bytes())
-              .await?;
           }
         }
       }
