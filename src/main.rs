@@ -13,8 +13,6 @@ use tokio::{
 use tokio_stream::StreamExt;
 use tracing::*;
 
-mod analysis;
-
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
 struct Args {
@@ -98,7 +96,7 @@ async fn main() -> Result<()> {
       let mut law_text_stream = tokio_stream::iter(law_text_lst);
       while let Some(law_text) = law_text_stream.next().await {
         let yomikae_info_lst_res =
-          analysis::parse_yomikae(&law_text, &num, &chapter, &args.mecab_ipadic).await;
+          analysis_yomikae::parse_yomikae(&law_text, &num, &chapter, &args.mecab_ipadic).await;
         match yomikae_info_lst_res {
           Ok(yomikae_info_lst) => {
             if !yomikae_info_lst.is_empty() {
