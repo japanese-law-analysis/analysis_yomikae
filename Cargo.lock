@@ -340,7 +340,7 @@ dependencies = [
 [[package]]
 name = "listup_law"
 version = "0.5.0"
-source = "git+https://github.com/japanese-law-analysis/listup_law.git#8f6534c7b66625730bdc351d26a089f42aad0d40"
+source = "git+https://github.com/japanese-law-analysis/listup_law.git#361e52a6b07c21a8b67cbe8ce3f1c4040e2f9983"
 dependencies = [
  "anyhow",
  "clap 3.2.23",

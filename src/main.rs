@@ -87,12 +87,14 @@ async fn main() -> Result<()> {
       .with_context(|| format!("not found file name with law num: {num}"))?;
     let file_path = work_dir_path.join(file_name);
     info!("[START] work file: {:?}", file_path);
-    let mut reader = Reader::from_reader(BufReader::new(File::open(&file_path).await?));
     let chapter_lst = law_paragraph.chapter_data;
     let mut chapter_stream = tokio_stream::iter(chapter_lst);
     while let Some(chapter) = chapter_stream.next().await {
+      info!("[DATA] chapter; {num}:{chapter:?}");
+      let mut reader = Reader::from_reader(BufReader::new(File::open(&file_path).await?));
       let target = target_info_from_chapter_lst(&chapter).await;
       let law_text_lst = jplaw_text::search_law_text(&mut reader, &target).await?;
+      info!("[DATA] law_text_lst; {num}:{chapter:?}:{law_text_lst:?}");
       let mut law_text_stream = tokio_stream::iter(law_text_lst);
       while let Some(law_text) = law_text_stream.next().await {
         let yomikae_info_lst_res =

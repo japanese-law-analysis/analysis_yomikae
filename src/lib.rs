@@ -85,10 +85,11 @@ pub async fn parse_yomikae(
               ("「", "記号") => {
                 if features.nth(0).unwrap() == "括弧開" {
                   if open_kakko_depth >= 1 {
-                    word_in_kakko.push_str(word)
+                    // 鉤括弧内の鉤括弧であるので、鉤括弧も登場単語として登録する
+                    word_in_kakko.push_str(word);
                   }
                   open_kakko_depth += 1;
-                } else if open_kakko_depth >= 1 {
+                } else {
                   word_in_kakko.push_str(word);
                 }
               }
@@ -120,11 +121,13 @@ pub async fn parse_yomikae(
                                   return Err(YomikaeError::UnexpectedParallelWords(law_info));
                                 }
                                 before_words.push(word_in_kakko);
+                                word_in_kakko = String::new();
                                 is_before_words_end = false;
                                 node = node_next2;
                               }
                               ("ある", "動詞") => {
                                 before_words.push(word_in_kakko);
+                                word_in_kakko = String::new();
                                 is_before_words_end = true;
                                 node = node_next2;
                               }
@@ -136,6 +139,7 @@ pub async fn parse_yomikae(
                                     before_words,
                                     after_word: word_in_kakko,
                                   };
+                                  word_in_kakko = String::new();
                                   yomikae_info_lst.push(yomikae_info);
                                   is_before_words_end = false;
                                 }
@@ -149,6 +153,7 @@ pub async fn parse_yomikae(
                                   before_words,
                                   after_word: word_in_kakko,
                                 };
+                                word_in_kakko = String::new();
                                 yomikae_info_lst.push(yomikae_info);
                                 is_before_words_end = false;
                                 before_words = vec![];
@@ -169,10 +174,13 @@ pub async fn parse_yomikae(
                       before_words = vec![];
                     }
                   } else {
-                    word_in_kakko.push_str(word)
+                    // 鉤括弧内に出てきた閉じ鉤括弧
+                    word_in_kakko.push_str(word);
+                    open_kakko_depth -= 1;
                   }
+                } else {
+                  word_in_kakko.push_str(word);
                 }
-                word_in_kakko = String::new();
               }
               (_, _) => {
                 if open_kakko_depth >= 1 {
@@ -310,6 +318,80 @@ async fn check3() {
         "その者".to_string()
       ],
       after_word: "都道府県の教育委員会".to_string()
+    }],
+    yomikae_info_lst
+  )
+}
+
+#[tokio::test]
+async fn check4() {
+  let lawtext = LawText {
+      is_child : false,
+      contents : LawContents::Text("この場合において、徴収法施行規則第二十七条及び第二十八条中「保険関係が成立した」とあるのは「失業保険法及び労働者災害補償保険法の一部を改正する法律及び労働保険の保険料の徴収等に関する法律の施行に伴う関係法律の整備等に関する法律（昭和四十四年法律第八十五号。以下「整備法」という。）第十八条第一項若しくは第二項、第十八条の二第一項若しくは第二項又は第十八条の三第一項若しくは第二項の規定による保険給付が行なわれることとなつた」と、「保険関係成立の日」とあるのは「当該保険給付が行なわれることとなつた日」と、徴収法施行規則第二十八条第一項中「全期間」とあるのは「整備法第十八条第一項若しくは第二項、第十八条の二第一項若しくは第二項又は第十八条の三第一項若しくは第二項の規定による保険給付が行なわれることとなつた日以後の期間（事業の終了する日前に失業保険法及び労働者災害補償保険法の一部を改正する法律及び労働保険の保険料の徴収等に関する法律の施行に伴う労働省令の整備等に関する省令（昭和四十七年労働省令第九号。以下「整備省令」という。）第八条の期間が経過するときは、その経過する日の前日までの期間）」と、徴収法施行規則第三十二条中「第二十七条から前条まで」とあるのは「第二十七条から第三十条まで」と、「法第十五条から法第十七条まで」とあるのは「法第十五条及び第十六条」と、「その事業の期間」とあるのは「整備法第十八条第一項若しくは第二項、第十八条の二第一項若しくは第二項又は第十八条の三第一項若しくは第二項の規定による保険給付が行なわれることとなつた日以後のその事業の期間（事業の終了する日前に整備省令第八条の期間が経過するときは、その経過する日の前日までの期間）」と読み替えるものとする。".to_string())
+    };
+  let chapter = Chapter {
+    part: None,
+    chapter: None,
+    section: None,
+    subsection: None,
+    division: None,
+    article: String::from("test"),
+    paragraph: None,
+    item: None,
+    sub_item: None,
+    suppl_provision_title: None,
+  };
+  let yomikae_info_lst = parse_yomikae(
+    &lawtext,
+    "test",
+    &chapter,
+    "/usr/lib/x86_64-linux-gnu/mecab/dic/mecab-ipadic-neologd",
+  )
+  .await
+  .unwrap();
+  assert_eq!(
+    vec![YomikaeInfo {
+      num: "test".to_string(),
+      chapter: chapter.clone(),
+      before_words: vec![
+        "保険関係が成立した".to_string()
+      ],
+      after_word: "失業保険法及び労働者災害補償保険法の一部を改正する法律及び労働保険の保険料の徴収等に関する法律の施行に伴う関係法律の整備等に関する法律（昭和四十四年法律第八十五号。以下「整備法」という。）第十八条第一項若しくは第二項、第十八条の二第一項若しくは第二項又は第十八条の三第一項若しくは第二項の規定による保険給付が行なわれることとなつた".to_string()
+    },YomikaeInfo {
+      num: "test".to_string(),
+      chapter: chapter.clone(),
+      before_words: vec![
+        "保険関係成立の日".to_string()
+      ],
+      after_word: "当該保険給付が行なわれることとなつた日".to_string()
+    },YomikaeInfo {
+      num: "test".to_string(),
+      chapter: chapter.clone(),
+      before_words: vec![
+        "全期間".to_string()
+      ],
+      after_word: "整備法第十八条第一項若しくは第二項、第十八条の二第一項若しくは第二項又は第十八条の三第一項若しくは第二項の規定による保険給付が行なわれることとなつた日以後の期間（事業の終了する日前に失業保険法及び労働者災害補償保険法の一部を改正する法律及び労働保険の保険料の徴収等に関する法律の施行に伴う労働省令の整備等に関する省令（昭和四十七年労働省令第九号。以下「整備省令」という。）第八条の期間が経過するときは、その経過する日の前日までの期間）".to_string()
+    },YomikaeInfo {
+      num: "test".to_string(),
+      chapter: chapter.clone(),
+      before_words: vec![
+        "第二十七条から前条まで".to_string()
+      ],
+      after_word: "第二十七条から第三十条まで".to_string()
+    },YomikaeInfo {
+      num: "test".to_string(),
+      chapter: chapter.clone(),
+      before_words: vec![
+        "法第十五条から法第十七条まで".to_string()
+      ],
+      after_word: "法第十五条及び第十六条".to_string()
+    },YomikaeInfo {
+      num: "test".to_string(),
+      chapter: chapter.clone(),
+      before_words: vec![
+        "その事業の期間".to_string()
+      ],
+      after_word: "整備法第十八条第一項若しくは第二項、第十八条の二第一項若しくは第二項又は第十八条の三第一項若しくは第二項の規定による保険給付が行なわれることとなつた日以後のその事業の期間（事業の終了する日前に整備省令第八条の期間が経過するときは、その経過する日の前日までの期間）".to_string()
     }],
     yomikae_info_lst
   )
