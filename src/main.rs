@@ -95,7 +95,7 @@ async fn main() -> Result<()> {
       let mut reader = Reader::from_reader(BufReader::new(File::open(&file_path).await?));
       let target = target_info_from_chapter_lst(&chapter).await;
       let law_text_lst = jplaw_text::search_law_text(&mut reader, &target).await?;
-      let mut law_text_stream = tokio_stream::iter(law_text_lst);
+      let mut law_text_stream = tokio_stream::iter(law_text_lst).filter(|c| !c.is_child);
       while let Some(law_text) = law_text_stream.next().await {
         let yomikae_info_lst_res =
           analysis_yomikae::parse_yomikae(&law_text, &num, &chapter, &args.mecab_ipadic).await;
