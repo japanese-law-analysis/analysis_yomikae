@@ -1,3 +1,4 @@
+use analysis_yomikae::*;
 use anyhow::{Context, Result};
 use clap::Parser;
 use jplaw_text::ArticleTargetInfo;
@@ -94,7 +95,6 @@ async fn main() -> Result<()> {
       let mut reader = Reader::from_reader(BufReader::new(File::open(&file_path).await?));
       let target = target_info_from_chapter_lst(&chapter).await;
       let law_text_lst = jplaw_text::search_law_text(&mut reader, &target).await?;
-      info!("[DATA] law_text_lst; {num}:{chapter:?}:{law_text_lst:?}");
       let mut law_text_stream = tokio_stream::iter(law_text_lst);
       while let Some(law_text) = law_text_stream.next().await {
         let yomikae_info_lst_res =
@@ -115,6 +115,27 @@ async fn main() -> Result<()> {
                   .write_all(yomikae_info_json_str.as_bytes())
                   .await?;
               }
+            } else {
+              let law_info = LawInfo {
+                num: num.to_string(),
+                chapter: chapter.clone(),
+                contents: law_text.clone(),
+              };
+              let err = YomikaeError::NotFoundYomikae(law_info);
+              let mut error_stream = tokio_stream::iter(&error_lst);
+              let is_err_exist = error_stream.any(|e| e == &err).await;
+              if !is_err_exist {
+                error_lst.push(err.clone());
+                if is_error_head {
+                  error_output_file.write_all("\n".as_bytes()).await?;
+                  is_error_head = false;
+                } else {
+                  error_output_file.write_all(",\n".as_bytes()).await?;
+                };
+                error_output_file
+                  .write_all(serde_json::to_string(&err)?.as_bytes())
+                  .await?;
+              };
             }
           }
           Err(err) => {

@@ -20,6 +20,8 @@ pub enum YomikaeError {
   UnmatchedParen(LawInfo),
   #[error("Unexpected parallel words at {0:?}")]
   UnexpectedParallelWords(LawInfo),
+  #[error("Not found yomikae sentence at {0:?}")]
+  NotFoundYomikae(LawInfo),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
