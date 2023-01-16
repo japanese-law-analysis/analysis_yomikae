@@ -2,8 +2,18 @@
 name = "analysis_yomikae"
 version = "0.1.0"
 edition = "2021"
+authors = ["Naoki Kaneko <puripuri2100@gmail.com>"]
+rust = "1.64.0"
+license = "MIT"
+description = "読み替え文を解析し、読み替えられる対象の文言と、読み替え後の文言を取り出す"
+readme = "README.md"
+repository = "https://github.com/japanese-law-analysis/analysis_yomikae"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[badges]
+github = { repository = "japanese-law-analysis/analysis_yomikae", workflow = "Rust CI" }
+
 
 [dependencies]
 mecab = "0.1.5"
