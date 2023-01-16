@@ -292,7 +292,7 @@ checksum = "4217ad341ebadf8d8e724e264f13e593e0648f5b3e94b3896a5df283be015ecc"
 [[package]]
 name = "jplaw_text"
 version = "0.2.0"
-source = "git+https://github.com/japanese-law-analysis/jplaw_text.git#ecdbbc5fbf949b8c622eb4fa989aaed04200a5e1"
+source = "git+https://github.com/japanese-law-analysis/jplaw_text.git?rev=ecdbbc5#ecdbbc5fbf949b8c622eb4fa989aaed04200a5e1"
 dependencies = [
  "encoding_rs",
  "quick-xml",
@@ -340,7 +340,7 @@ dependencies = [
 [[package]]
 name = "listup_law"
 version = "0.5.0"
-source = "git+https://github.com/japanese-law-analysis/listup_law.git#361e52a6b07c21a8b67cbe8ce3f1c4040e2f9983"
+source = "git+https://github.com/japanese-law-analysis/listup_law.git?rev=361e52a#361e52a6b07c21a8b67cbe8ce3f1c4040e2f9983"
 dependencies = [
  "anyhow",
  "clap 3.2.23",
@@ -571,7 +571,7 @@ checksum = "d29ab0c6d3fc0ee92fe66e2d99f700eab17a8d57d1c1d3b748380fb20baa78cd"
 [[package]]
 name = "search_article_with_word"
 version = "0.2.0"
-source = "git+https://github.com/japanese-law-analysis/search_article_with_word.git#578feecb205a9d1c14acad2374675c459e24920f"
+source = "git+https://github.com/japanese-law-analysis/search_article_with_word.git?rev=578feec#578feecb205a9d1c14acad2374675c459e24920f"
 dependencies = [
  "anyhow",
  "clap 4.0.29",
