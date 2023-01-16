@@ -17,6 +17,10 @@ jobs:
           ~/.cargo/git
           target
         key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+    - uses: awalsh128/cache-apt-pkgs-action@latest
+      with:
+        packages: mecab libmecab-dev mecab-ipadic-utf8
+        version: 1.0
     - uses: actions-rs/toolchain@v1
       with:
         toolchain: stable
@@ -38,6 +42,10 @@ jobs:
           ~/.cargo/git
           target
         key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+    - uses: awalsh128/cache-apt-pkgs-action@latest
+      with:
+        packages: mecab libmecab-dev mecab-ipadic-utf8
+        version: 1.0
     - uses: actions-rs/toolchain@v1
       with:
         toolchain: 1.64.0
@@ -49,7 +57,7 @@ jobs:
     runs-on: ${{ matrix.operating-system }}
     strategy:
       matrix:
-        operating-system: [ubuntu-latest, windows-latest] #[macos-latest, ubuntu-latest, windows-latest]
+        operating-system: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
     - uses: actions/cache@v3
@@ -59,6 +67,10 @@ jobs:
           ~/.cargo/git
           target
         key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+    - uses: awalsh128/cache-apt-pkgs-action@latest
+      with:
+        packages: mecab libmecab-dev mecab-ipadic-utf8
+        version: 1.0
     - uses: actions-rs/toolchain@v1
       with:
         toolchain: stable
