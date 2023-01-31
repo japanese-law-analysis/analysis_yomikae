@@ -127,6 +127,7 @@ pub async fn parse_yomikae(
               // 「とある」     => before_wordsに追加し、そこで打ち止め
               // 「と、」       => after_wordにし、yomikae_info_lstに追加し初期化
               // 「と読み替える」 => yomikae_info_lstに追加し初期化
+              // 「と「」         => 「と、」と基本同じ
               // それ以外         => すべて初期化
               if let Some('と') = chars_stream.next().await {
                 if let Some(c_next2) = chars_stream.next().await {
@@ -182,6 +183,21 @@ pub async fn parse_yomikae(
                           }
                         }
                       }
+                    }
+                    '「' => {
+                      // 終了処理をしてすぐに開始する
+                      let yomikae_info = YomikaeInfo {
+                        num: num.to_string(),
+                        chapter: chapter.clone(),
+                        before_words: before_words.clone(),
+                        after_word: word_in_kakko,
+                      };
+                      word_in_kakko = String::new();
+                      yomikae_info_lst.push(yomikae_info);
+                      is_before_words_end = false;
+                      before_words = vec![];
+
+                      open_kakko_depth += 1;
                     }
                     _ => {
                       before_words = vec![];
@@ -248,6 +264,41 @@ async fn check2() {
   let lawtext = LawText {
       is_child : false,
       contents : LawContents::Text("この場合において、同条中「子ども・子育て支援法（平成二十四年法律第六十五号）第六十九条」とあるのは「平成二十二年度等における子ども手当の支給に関する法律（平成二十二年法律第十九号）第二十条第一項の規定により適用される児童手当法の一部を改正する法律（平成二十四年法律第二十四号）附則第十一条の規定によりなおその効力を有するものとされた同法第一条の規定による改正前の児童手当法（昭和四十六年法律第七十三号）第二十条」と、「子ども・子育て拠出金」とあるのは「子ども手当拠出金」と読み替えるものとする。".to_string())
+    };
+  let chapter = Chapter {
+    part: None,
+    chapter: None,
+    section: None,
+    subsection: None,
+    division: None,
+    article: String::from("test"),
+    paragraph: None,
+    item: None,
+    sub_item: None,
+    suppl_provision_title: None,
+  };
+  let yomikae_info_lst = parse_yomikae(&lawtext, "test", &chapter).await.unwrap();
+  assert_eq!(
+    vec![YomikaeInfo {
+      num: "test".to_string(),
+      chapter: chapter.clone(),
+      before_words: vec!["子ども・子育て支援法（平成二十四年法律第六十五号）第六十九条".to_string()],
+      after_word: "平成二十二年度等における子ども手当の支給に関する法律（平成二十二年法律第十九号）第二十条第一項の規定により適用される児童手当法の一部を改正する法律（平成二十四年法律第二十四号）附則第十一条の規定によりなおその効力を有するものとされた同法第一条の規定による改正前の児童手当法（昭和四十六年法律第七十三号）第二十条".to_string()
+    },YomikaeInfo{
+      num:"test".to_string(),
+      chapter: chapter,
+      before_words :vec!["子ども・子育て拠出金".to_string()],
+      after_word : "子ども手当拠出金".to_string()
+    }],
+    yomikae_info_lst
+  )
+}
+
+#[tokio::test]
+async fn check2_2() {
+  let lawtext = LawText {
+      is_child : false,
+      contents : LawContents::Text("この場合において、同条中「子ども・子育て支援法（平成二十四年法律第六十五号）第六十九条」とあるのは「平成二十二年度等における子ども手当の支給に関する法律（平成二十二年法律第十九号）第二十条第一項の規定により適用される児童手当法の一部を改正する法律（平成二十四年法律第二十四号）附則第十一条の規定によりなおその効力を有するものとされた同法第一条の規定による改正前の児童手当法（昭和四十六年法律第七十三号）第二十条」と「子ども・子育て拠出金」とあるのは「子ども手当拠出金」と読み替えるものとする。".to_string())
     };
   let chapter = Chapter {
     part: None,
