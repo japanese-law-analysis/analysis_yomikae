@@ -449,49 +449,44 @@ async fn check5() {
   };
   let yomikae_info_lst = parse_yomikae(&lawtext, "test", &chapter).await.unwrap();
   assert_eq!(
-    vec![YomikaeInfo {
-      num: "test".to_string(),
-      chapter: chapter.clone(),
-      before_words: vec![
-        "法第六十九条の三十三第一項".to_string()
-      ],
-      after_word: "令第三十七条の七第一項".to_string()
-    },YomikaeInfo {
-      num: "test".to_string(),
-      chapter: chapter.clone(),
-      before_words: vec![
-        "前条".to_string()
-      ],
-      after_word: "第百十三条の三十七".to_string()
-    },YomikaeInfo {
-      num: "test".to_string(),
-      chapter: chapter.clone(),
-      before_words: vec![
-        "令第三十五条の十六第一項第二号イ".to_string()
-      ],
-      after_word: "令第三十七条の七第四項第三号イ".to_string()
-    },YomikaeInfo {
-      num: "test".to_string(),
-      chapter: chapter.clone(),
-      before_words: vec![
-        "令第三十五条の十六第一項第二号ロ".to_string()
-      ],
-      after_word: "令第三十七条の七第四項第三号ロ".to_string()
-    },YomikaeInfo {
-      num: "test".to_string(),
-      chapter: chapter.clone(),
-      before_words: vec![
-        "令第三十五条の十六第一項第二号ハ".to_string()
-      ],
-      after_word: "令第三十七条の七第四項第三号ハ".to_string()
-    },YomikaeInfo {
-      num: "test".to_string(),
-      chapter: chapter.clone(),
-      before_words: vec![
-        "実務研修受講試験の合格年月日並びに研修の受講の開始年月日".to_string()
-      ],
-      after_word: "研修の受講の開始年月日".to_string()
-    }],
+    vec![
+      YomikaeInfo {
+        num: "test".to_string(),
+        chapter: chapter.clone(),
+        before_words: vec!["法第六十九条の三十三第一項".to_string()],
+        after_word: "令第三十七条の七第一項".to_string()
+      },
+      YomikaeInfo {
+        num: "test".to_string(),
+        chapter: chapter.clone(),
+        before_words: vec!["前条".to_string()],
+        after_word: "第百十三条の三十七".to_string()
+      },
+      YomikaeInfo {
+        num: "test".to_string(),
+        chapter: chapter.clone(),
+        before_words: vec!["令第三十五条の十六第一項第二号イ".to_string()],
+        after_word: "令第三十七条の七第四項第三号イ".to_string()
+      },
+      YomikaeInfo {
+        num: "test".to_string(),
+        chapter: chapter.clone(),
+        before_words: vec!["令第三十五条の十六第一項第二号ロ".to_string()],
+        after_word: "令第三十七条の七第四項第三号ロ".to_string()
+      },
+      YomikaeInfo {
+        num: "test".to_string(),
+        chapter: chapter.clone(),
+        before_words: vec!["令第三十五条の十六第一項第二号ハ".to_string()],
+        after_word: "令第三十七条の七第四項第三号ハ".to_string()
+      },
+      YomikaeInfo {
+        num: "test".to_string(),
+        chapter: chapter.clone(),
+        before_words: vec!["実務研修受講試験の合格年月日並びに研修の受講の開始年月日".to_string()],
+        after_word: "研修の受講の開始年月日".to_string()
+      }
+    ],
     yomikae_info_lst
   )
 }
