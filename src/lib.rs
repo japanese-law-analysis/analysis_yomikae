@@ -157,10 +157,12 @@ pub async fn parse_yomikae(
                         num: num.to_string(),
                         chapter: chapter.clone(),
                         before_words: before_words.clone(),
-                        after_word: word_in_kakko,
+                        after_word: word_in_kakko.clone(),
                       };
+                      if !before_words.is_empty() && !word_in_kakko.is_empty() {
+                        yomikae_info_lst.push(yomikae_info);
+                      }
                       word_in_kakko = String::new();
-                      yomikae_info_lst.push(yomikae_info);
                       is_before_words_end = false;
                       before_words = vec![];
                     }
@@ -173,10 +175,12 @@ pub async fn parse_yomikae(
                                 num: num.to_string(),
                                 chapter: chapter.clone(),
                                 before_words: before_words.clone(),
-                                after_word: word_in_kakko,
+                                after_word: word_in_kakko.clone(),
                               };
+                              if !before_words.is_empty() && !word_in_kakko.is_empty() {
+                                yomikae_info_lst.push(yomikae_info);
+                              }
                               word_in_kakko = String::new();
-                              yomikae_info_lst.push(yomikae_info);
                               is_before_words_end = false;
                               before_words = vec![];
                             }
@@ -190,10 +194,12 @@ pub async fn parse_yomikae(
                         num: num.to_string(),
                         chapter: chapter.clone(),
                         before_words: before_words.clone(),
-                        after_word: word_in_kakko,
+                        after_word: word_in_kakko.clone(),
                       };
+                      if !before_words.is_empty() && !word_in_kakko.is_empty() {
+                        yomikae_info_lst.push(yomikae_info);
+                      }
                       word_in_kakko = String::new();
-                      yomikae_info_lst.push(yomikae_info);
                       is_before_words_end = false;
                       before_words = vec![];
 
