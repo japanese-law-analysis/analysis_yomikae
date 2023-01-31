@@ -32,9 +32,6 @@ struct Args {
   /// 解析する対象の条文のインデックスが書かれたJSONファイルへのpath
   #[clap(short, long)]
   article_info_file: String,
-  /// 解析する対象の条文のインデックスが書かれたJSONファイルへのpath
-  #[clap(short, long, default_value_t = String::from("/usr/lib/x86_64-linux-gnu/mecab/dic/mecab-ipadic-neologd"))]
-  mecab_ipadic: String,
 }
 
 async fn init_logger() -> Result<()> {
@@ -97,8 +94,7 @@ async fn main() -> Result<()> {
       let law_text_lst = jplaw_text::search_law_text(&mut reader, &target).await?;
       let mut law_text_stream = tokio_stream::iter(law_text_lst).filter(|c| !c.is_child);
       while let Some(law_text) = law_text_stream.next().await {
-        let yomikae_info_lst_res =
-          analysis_yomikae::parse_yomikae(&law_text, &num, &chapter, &args.mecab_ipadic).await;
+        let yomikae_info_lst_res = analysis_yomikae::parse_yomikae(&law_text, &num, &chapter).await;
         match yomikae_info_lst_res {
           Ok(yomikae_info_lst) => {
             if !yomikae_info_lst.is_empty() {

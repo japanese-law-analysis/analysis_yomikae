@@ -41,10 +41,10 @@
 //!
 
 use jplaw_text::{LawContents, LawText};
-use mecab::Tagger;
 use search_article_with_word::Chapter;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
+use tokio_stream::StreamExt;
 use tracing::*;
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Hash, Deserialize)]
@@ -86,7 +86,6 @@ pub async fn parse_yomikae(
   law_text: &LawText,
   num: &str,
   chapter: &Chapter,
-  mecab_ipadic_path: &str,
 ) -> Result<Vec<YomikaeInfo>, YomikaeError> {
   let law_info = LawInfo {
     num: num.to_string(),
@@ -97,10 +96,8 @@ pub async fn parse_yomikae(
   match input {
     LawContents::Text(input) => {
       info!("[INPUT] {num} : {:?}", input);
-      let bytes_of_input = input.as_bytes();
 
-      let mut tagger = Tagger::new(mecab_ipadic_path);
-      let mut node = tagger.parse_to_node(bytes_of_input);
+      let mut chars_stream = tokio_stream::iter(input.chars());
 
       let mut yomikae_info_lst = Vec::new();
 
@@ -112,133 +109,100 @@ pub async fn parse_yomikae(
       let mut before_words = Vec::new();
       let mut is_before_words_end = false;
 
-      loop {
-        match node.stat as i32 {
-          mecab::MECAB_BOS_NODE => {
-            info!("[START [PARSE] {num} : {chapter:?}");
+      while let Some(c) = chars_stream.next().await {
+        match c {
+          '「' => {
+            if open_kakko_depth >= 1 {
+              // 鉤括弧内の鉤括弧であるので、鉤括弧も登場単語として登録する
+              word_in_kakko.push(c);
+            }
+            open_kakko_depth += 1;
           }
-          mecab::MECAB_EOS_NODE => {
-            info!("[END PARSE] {num} : {chapter:?}");
-            break;
-          }
-          _ => {
-            let word = &(node.surface)[..(node.length as usize)];
-            let mut features = node.feature.split(',');
-            // 品詞情報
-            let hinshi: &str = features.nth(0).unwrap();
-            match (word, hinshi) {
-              ("「", "記号") => {
-                if features.nth(0).unwrap() == "括弧開" {
-                  if open_kakko_depth >= 1 {
-                    // 鉤括弧内の鉤括弧であるので、鉤括弧も登場単語として登録する
-                    word_in_kakko.push_str(word);
-                  }
-                  open_kakko_depth += 1;
-                } else {
-                  word_in_kakko.push_str(word);
-                }
-              }
-              ("」", "記号") => {
-                if features.nth(0).unwrap() == "括弧閉" {
-                  if open_kakko_depth == 0 {
-                    return Err(YomikaeError::UnmatchedParen(law_info));
-                  } else if open_kakko_depth == 1 {
-                    open_kakko_depth = 0;
-                    // 「とあり」     => before_wordsに追加
-                    // 「とある」     => before_wordsに追加し、そこで打ち止め
-                    // 「と、」       => after_wordにし、yomikae_info_lstに追加し初期化
-                    // 「と読み替える」 => yomikae_info_lstに追加し初期化
-                    // それ以外         => すべて初期化
-                    if let Some(node_next1) = node.next() {
-                      let word_next1 = &(node_next1.surface)[..(node_next1.length as usize)];
-                      let mut features_next1 = node_next1.feature.split(',');
-                      let hinshi_next1: &str = features_next1.nth(0).unwrap();
-                      match (word_next1, hinshi_next1) {
-                        ("と", "助詞") => {
-                          node = node_next1;
-                          if let Some(node_next2) = node.next() {
-                            let word_next2 = &(node_next2.surface)[..(node_next2.length as usize)];
-                            let mut features_next2 = node_next2.feature.split(',');
-                            let hinshi_next2: &str = features_next2.nth(0).unwrap();
-                            match (word_next2, hinshi_next2) {
-                              ("あり", "動詞") => {
-                                if is_before_words_end {
-                                  return Err(YomikaeError::UnexpectedParallelWords(law_info));
-                                }
-                                before_words.push(word_in_kakko);
-                                word_in_kakko = String::new();
-                                is_before_words_end = false;
-                                node = node_next2;
-                              }
-                              ("ある", "動詞") => {
-                                before_words.push(word_in_kakko);
-                                word_in_kakko = String::new();
-                                is_before_words_end = true;
-                                node = node_next2;
-                              }
-                              ("、", "記号") => {
-                                if features_next2.nth(0).unwrap() == "読点" {
-                                  let yomikae_info = YomikaeInfo {
-                                    num: num.to_string(),
-                                    chapter: chapter.clone(),
-                                    before_words,
-                                    after_word: word_in_kakko,
-                                  };
-                                  word_in_kakko = String::new();
-                                  yomikae_info_lst.push(yomikae_info);
-                                  is_before_words_end = false;
-                                }
-                                before_words = vec![];
-                                node = node_next2;
-                              }
-                              ("読み替える", "動詞") => {
-                                let yomikae_info = YomikaeInfo {
-                                  num: num.to_string(),
-                                  chapter: chapter.clone(),
-                                  before_words,
-                                  after_word: word_in_kakko,
-                                };
-                                word_in_kakko = String::new();
-                                yomikae_info_lst.push(yomikae_info);
-                                is_before_words_end = false;
-                                before_words = vec![];
-                                node = node_next2;
-                              }
-                              _ => {
-                                before_words = vec![];
-                              }
+          '」' => {
+            if open_kakko_depth == 0 {
+              return Err(YomikaeError::UnmatchedParen(law_info));
+            } else if open_kakko_depth == 1 {
+              open_kakko_depth = 0;
+              // 「とあり」     => before_wordsに追加
+              // 「とある」     => before_wordsに追加し、そこで打ち止め
+              // 「と、」       => after_wordにし、yomikae_info_lstに追加し初期化
+              // 「と読み替える」 => yomikae_info_lstに追加し初期化
+              // それ以外         => すべて初期化
+              if let Some('と') = chars_stream.next().await {
+                if let Some(c_next2) = chars_stream.next().await {
+                  match c_next2 {
+                    'あ' => {
+                      if let Some(c_next3) = chars_stream.next().await {
+                        match c_next3 {
+                          'り' => {
+                            if is_before_words_end {
+                              return Err(YomikaeError::UnexpectedParallelWords(law_info));
                             }
-                          } else {
+                            before_words.push(word_in_kakko);
+                            word_in_kakko = String::new();
+                            is_before_words_end = false;
                           }
-                        }
-                        _ => {
-                          before_words = vec![];
+                          'る' => {
+                            before_words.push(word_in_kakko);
+                            word_in_kakko = String::new();
+                            is_before_words_end = true;
+                          }
+                          _ => before_words = vec![],
                         }
                       }
-                    } else {
+                    }
+                    '、' => {
+                      let yomikae_info = YomikaeInfo {
+                        num: num.to_string(),
+                        chapter: chapter.clone(),
+                        before_words: before_words.clone(),
+                        after_word: word_in_kakko,
+                      };
+                      word_in_kakko = String::new();
+                      yomikae_info_lst.push(yomikae_info);
+                      is_before_words_end = false;
                       before_words = vec![];
                     }
-                  } else {
-                    // 鉤括弧内に出てきた閉じ鉤括弧
-                    word_in_kakko.push_str(word);
-                    open_kakko_depth -= 1;
+                    '読' => {
+                      if let Some('み') = chars_stream.next().await {
+                        if let Some('替') = chars_stream.next().await {
+                          if let Some('え') = chars_stream.next().await {
+                            if let Some('る') = chars_stream.next().await {
+                              let yomikae_info = YomikaeInfo {
+                                num: num.to_string(),
+                                chapter: chapter.clone(),
+                                before_words: before_words.clone(),
+                                after_word: word_in_kakko,
+                              };
+                              word_in_kakko = String::new();
+                              yomikae_info_lst.push(yomikae_info);
+                              is_before_words_end = false;
+                              before_words = vec![];
+                            }
+                          }
+                        }
+                      }
+                    }
+                    _ => {
+                      before_words = vec![];
+                    }
                   }
                 } else {
-                  word_in_kakko.push_str(word);
                 }
+              } else {
+                before_words = vec![];
               }
-              (_, _) => {
-                if open_kakko_depth >= 1 {
-                  word_in_kakko.push_str(word);
-                }
-              }
+            } else {
+              // 鉤括弧内に出てきた閉じ鉤括弧
+              word_in_kakko.push(c);
+              open_kakko_depth -= 1;
             }
           }
-        }
-        if let Some(new_node) = node.next() {
-          node = new_node
-        } else {
-          break;
+          _ => {
+            if open_kakko_depth >= 1 {
+              word_in_kakko.push(c);
+            }
+          }
         }
       }
 
@@ -267,14 +231,7 @@ async fn check1() {
     sub_item: None,
     suppl_provision_title: None,
   };
-  let yomikae_info_lst = parse_yomikae(
-    &lawtext,
-    "test",
-    &chapter,
-    "/usr/lib/x86_64-linux-gnu/mecab/dic/mecab-ipadic-neologd",
-  )
-  .await
-  .unwrap();
+  let yomikae_info_lst = parse_yomikae(&lawtext, "test", &chapter).await.unwrap();
   assert_eq!(
     vec![YomikaeInfo {
       num: "test".to_string(),
@@ -304,14 +261,7 @@ async fn check2() {
     sub_item: None,
     suppl_provision_title: None,
   };
-  let yomikae_info_lst = parse_yomikae(
-    &lawtext,
-    "test",
-    &chapter,
-    "/usr/lib/x86_64-linux-gnu/mecab/dic/mecab-ipadic-neologd",
-  )
-  .await
-  .unwrap();
+  let yomikae_info_lst = parse_yomikae(&lawtext, "test", &chapter).await.unwrap();
   assert_eq!(
     vec![YomikaeInfo {
       num: "test".to_string(),
@@ -346,14 +296,7 @@ async fn check3() {
     sub_item: None,
     suppl_provision_title: None,
   };
-  let yomikae_info_lst = parse_yomikae(
-    &lawtext,
-    "test",
-    &chapter,
-    "/usr/lib/x86_64-linux-gnu/mecab/dic/mecab-ipadic-neologd",
-  )
-  .await
-  .unwrap();
+  let yomikae_info_lst = parse_yomikae(&lawtext, "test", &chapter).await.unwrap();
   assert_eq!(
     vec![YomikaeInfo {
       num: "test".to_string(),
@@ -386,14 +329,7 @@ async fn check4() {
     sub_item: None,
     suppl_provision_title: None,
   };
-  let yomikae_info_lst = parse_yomikae(
-    &lawtext,
-    "test",
-    &chapter,
-    "/usr/lib/x86_64-linux-gnu/mecab/dic/mecab-ipadic-neologd",
-  )
-  .await
-  .unwrap();
+  let yomikae_info_lst = parse_yomikae(&lawtext, "test", &chapter).await.unwrap();
   assert_eq!(
     vec![YomikaeInfo {
       num: "test".to_string(),
