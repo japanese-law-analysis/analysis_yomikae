@@ -428,3 +428,70 @@ async fn check4() {
     yomikae_info_lst
   )
 }
+
+#[tokio::test]
+async fn check5() {
+  let lawtext = LawText {
+      is_child : false,
+      contents : LawContents::Text("第百十三条の三十八の規定は、調査員養成研修について準用する。この場合において、同条第一項中「法第六十九条の三十三第一項」とあるのは「令第三十七条の七第一項」と、同項第五号中「前条」とあるのは「第百十三条の三十七」と、同条第二項中「令第三十五条の十六第一項第二号イ」とあるのは「令第三十七条の七第四項第三号イ」と、同条第三項中「令第三十五条の十六第一項第二号ロ」とあるのは「令第三十七条の七第四項第三号ロ」と、同条第四項中「令第三十五条の十六第一項第二号ハ」とあるのは「令第三十七条の七第四項第三号ハ」と「実務研修受講試験の合格年月日並びに研修の受講の開始年月日」とあるのは「研修の受講の開始年月日」と読み替えるものとする。".to_string())
+    };
+  let chapter = Chapter {
+    part: None,
+    chapter: None,
+    section: None,
+    subsection: None,
+    division: None,
+    article: String::from("test"),
+    paragraph: None,
+    item: None,
+    sub_item: None,
+    suppl_provision_title: None,
+  };
+  let yomikae_info_lst = parse_yomikae(&lawtext, "test", &chapter).await.unwrap();
+  assert_eq!(
+    vec![YomikaeInfo {
+      num: "test".to_string(),
+      chapter: chapter.clone(),
+      before_words: vec![
+        "法第六十九条の三十三第一項".to_string()
+      ],
+      after_word: "令第三十七条の七第一項".to_string()
+    },YomikaeInfo {
+      num: "test".to_string(),
+      chapter: chapter.clone(),
+      before_words: vec![
+        "前条".to_string()
+      ],
+      after_word: "第百十三条の三十七".to_string()
+    },YomikaeInfo {
+      num: "test".to_string(),
+      chapter: chapter.clone(),
+      before_words: vec![
+        "令第三十五条の十六第一項第二号イ".to_string()
+      ],
+      after_word: "令第三十七条の七第四項第三号イ".to_string()
+    },YomikaeInfo {
+      num: "test".to_string(),
+      chapter: chapter.clone(),
+      before_words: vec![
+        "令第三十五条の十六第一項第二号ロ".to_string()
+      ],
+      after_word: "令第三十七条の七第四項第三号ロ".to_string()
+    },YomikaeInfo {
+      num: "test".to_string(),
+      chapter: chapter.clone(),
+      before_words: vec![
+        "令第三十五条の十六第一項第二号ハ".to_string()
+      ],
+      after_word: "令第三十七条の七第四項第三号ハ".to_string()
+    },YomikaeInfo {
+      num: "test".to_string(),
+      chapter: chapter.clone(),
+      before_words: vec![
+        "実務研修受講試験の合格年月日並びに研修の受講の開始年月日".to_string()
+      ],
+      after_word: "研修の受講の開始年月日".to_string()
+    }],
+    yomikae_info_lst
+  )
+}
