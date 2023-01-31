@@ -16,7 +16,6 @@ github = { repository = "japanese-law-analysis/analysis_yomikae", workflow = "Ru
 
 
 [dependencies]
-mecab = "0.1.5"
 quick-xml = "0.26.0"
 clap = { version = "4.0.27", features = ["derive"] }
 serde = "1.0.147"

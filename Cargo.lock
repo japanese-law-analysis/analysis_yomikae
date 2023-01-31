@@ -10,7 +10,6 @@ dependencies = [
  "clap 4.0.29",
  "jplaw_text",
  "listup_law 0.5.0",
- "mecab",
  "quick-xml",
  "search_article_with_word",
  "serde",
@@ -373,12 +372,6 @@ checksum = "abb12e687cfb44aa40f41fc3978ef76448f9b6038cad6aef4259d3c095a2382e"
 dependencies = [
  "cfg-if",
 ]
-
-[[package]]
-name = "mecab"
-version = "0.1.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "580882e6a98cf6c399ef426e8352ee4f7e026925e80aff000099ef5096456774"
 
 [[package]]
 name = "memchr"
