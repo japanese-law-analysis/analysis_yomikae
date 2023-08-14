@@ -84,19 +84,21 @@ async fn main() -> Result<()> {
       match yomikae_info_lst_res {
         Ok(yomikae_info_lst) => {
           if !yomikae_info_lst.is_empty() {
-            let mut yomikae_info_stream = tokio_stream::iter(yomikae_info_lst);
-            while let Some(yomikae_info) = yomikae_info_stream.next().await {
-              let yomikae_info_json_str = serde_json::to_string(&yomikae_info)?;
-              if is_head {
-                output_file.write_all("\n".as_bytes()).await?;
-                is_head = false;
-              } else {
-                output_file.write_all(",\n".as_bytes()).await?;
-              };
-              output_file
-                .write_all(yomikae_info_json_str.as_bytes())
-                .await?;
-            }
+            let yomikae_data = YomikaeData {
+              num: num.clone(),
+              article: law_text.article_info.clone(),
+              data: yomikae_info_lst,
+            };
+            let yomikae_info_json_str = serde_json::to_string(&yomikae_data)?;
+            if is_head {
+              output_file.write_all("\n".as_bytes()).await?;
+              is_head = false;
+            } else {
+              output_file.write_all(",\n".as_bytes()).await?;
+            };
+            output_file
+              .write_all(yomikae_info_json_str.as_bytes())
+              .await?;
           } else {
             let law_info = LawInfo {
               num: num.to_string(),
