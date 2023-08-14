@@ -18,7 +18,7 @@ cargo install --git "https://github.com/japanese-law-analysis/analysis_yomikae.g
 ### 使い方
 
 ```sh
-analysis_yomikae -o output.json -e err.json -w law_xml -i index.json -a article_info.json
+analysis_yomikae -o output.json -e err.json -w law_xml -i index.json
 ```
 
 で起動します。
@@ -29,7 +29,6 @@ analysis_yomikae -o output.json -e err.json -w law_xml -i index.json -a article_
 - `-e`：解析に失敗した条文の情報を出力するJSONファイル
 - `-w`：法令XMLファイルがあるフォルダ
 - `-i`：法令のインデックス情報が書かれたJSONファイル [listup_law](https://github.com/japanese-law-analysis/listup_law)で生成するもの
-- `-a`：具体的に調べる条文の情報が書かれたJSONファイル [search_article_with_word](https://github.com/japanese-law-analysis/search_article_with_word)で生成するもの
 
 
 ## ライブラリを使う
