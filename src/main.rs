@@ -64,7 +64,7 @@ async fn main() -> Result<()> {
     let num = law_data.num;
     let file_name = law_data.file;
     let file_path = work_dir_path.join(file_name);
-    info!("[START] work file: {:?}", file_path);
+    info!("[START] work({num:?}): {file_path:?}");
     let mut f = File::open(&file_path).await?;
     let mut buf = Vec::new();
     f.read_to_end(&mut buf).await?;
@@ -72,12 +72,13 @@ async fn main() -> Result<()> {
     let yomikae_law_text_lst = law_text_lst
       .iter()
       .filter(|lawtext| match &lawtext.contents {
-        LawContents::Text(s) => s.contains("と読み替える。"),
+        LawContents::Text(s) => s.contains("と読み替える"),
         _ => false,
       })
       .collect::<Vec<_>>();
     let mut yomikae_law_text_stream = tokio_stream::iter(yomikae_law_text_lst);
     while let Some(law_text) = yomikae_law_text_stream.next().await {
+      info!("[START] work({num:?}->{:?})", law_text.article_info);
       let yomikae_info_lst_res =
         analysis_yomikae::parse_yomikae(law_text, &num, &law_text.article_info).await;
       match yomikae_info_lst_res {
@@ -137,15 +138,17 @@ async fn main() -> Result<()> {
           };
         }
       }
+      info!("[END] work({num:?}->{:?})", law_text.article_info);
     }
+    info!("[END] work({num:?}): {file_path:?}");
   }
 
   output_file.write_all("\n]".as_bytes()).await?;
-  info!("[END write json file");
+  info!("[END] write json file");
   output_file.flush().await?;
 
   error_output_file.write_all("\n]".as_bytes()).await?;
-  info!("[END write error output file");
+  info!("[END] write error output file");
   error_output_file.flush().await?;
 
   Ok(())
