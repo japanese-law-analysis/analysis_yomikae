@@ -69,18 +69,41 @@ async fn main() -> Result<()> {
     let mut buf = Vec::new();
     f.read_to_end(&mut buf).await?;
     let law_text_lst = xml_to_law_text(&buf).await?;
-    let yomikae_law_text_lst = law_text_lst
-      .iter()
-      .filter(|lawtext| match &lawtext.contents {
-        LawContents::Text(s) => s.contains("と読み替える"),
-        _ => false,
-      })
-      .collect::<Vec<_>>();
+    let mut law_text_stream = tokio_stream::iter(law_text_lst);
+    let mut yomikae_law_text_lst = Vec::new();
+    let mut is_yomikae_table = None;
+    while let Some(law_text) = law_text_stream.next().await {
+      match &law_text.contents {
+        LawContents::Text(s) => {
+          if s.contains("と読み替える") {
+            if s.contains("下欄に掲げる字句と読み替える")
+              || s.contains("下欄の字句と読み替える")
+              || s.contains("下欄に掲げる日又は月と読み替える")
+            {
+              is_yomikae_table = Some(law_text.article_info);
+            } else {
+              yomikae_law_text_lst.push(law_text);
+              is_yomikae_table = None;
+            }
+          }
+        }
+        LawContents::Table(_) => match &is_yomikae_table {
+          Some(article) if article == &law_text.article_info => {
+            yomikae_law_text_lst.push(law_text);
+            is_yomikae_table = None;
+          }
+          Some(article) => {
+            warn!("[WARNING] table not found: {:?}", article)
+          }
+          _ => (),
+        },
+      }
+    }
     let mut yomikae_law_text_stream = tokio_stream::iter(yomikae_law_text_lst);
     while let Some(law_text) = yomikae_law_text_stream.next().await {
       info!("[START] work({num:?}->{:?})", law_text.article_info);
       let yomikae_info_lst_res =
-        analysis_yomikae::parse_yomikae(law_text, &num, &law_text.article_info).await;
+        analysis_yomikae::parse_yomikae(&law_text, &num, &law_text.article_info).await;
       match yomikae_info_lst_res {
         Ok(yomikae_info_lst) => {
           if !yomikae_info_lst.is_empty() {
