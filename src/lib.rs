@@ -39,7 +39,7 @@
 //! (c) 2023 Naoki Kaneko (a.k.a. "puripuri2100")
 //!
 
-use jplaw_text::{Article, LawContents, LawText};
+use jplaw_text::{Article, LawContents, LawTableColumn, LawTableContents, LawText};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use tokio_stream::StreamExt;
@@ -228,7 +228,34 @@ pub async fn parse_yomikae(
       Ok(yomikae_info_lst)
     }
 
-    LawContents::Table(_) => Err(YomikaeError::ContentsOfTable(law_info)),
+    LawContents::Table(table) => {
+      let mut table_stream = tokio_stream::iter(table);
+      let mut yomikae_info_lst = Vec::new();
+      while let Some(row) = table_stream.next().await {
+        let row = &row.row;
+        let len = row.len();
+        if len == 2 {
+          yomikae_info_lst.push(YomikaeInfo {
+            before_words: vec![get_table_text(&row[0])],
+            after_word: get_table_text(&row[1]),
+          })
+        } else if len == 3 {
+          yomikae_info_lst.push(YomikaeInfo {
+            before_words: vec![get_table_text(&row[1])],
+            after_word: get_table_text(&row[2]),
+          })
+        } else {
+          return Err(YomikaeError::ContentsOfTable(law_info));
+        }
+      }
+      Ok(yomikae_info_lst)
+    }
+  }
+}
+
+fn get_table_text(column: &LawTableColumn) -> String {
+  match column.clone().contents {
+    LawTableContents::Text(s) => s,
   }
 }
 
