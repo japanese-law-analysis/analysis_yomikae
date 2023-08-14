@@ -40,8 +40,7 @@
 //! (c) 2023 Naoki Kaneko (a.k.a. "puripuri2100")
 //!
 
-use jplaw_text::{LawContents, LawText};
-use search_article_with_word::Chapter;
+use jplaw_text::{Article, LawContents, LawText};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use tokio_stream::StreamExt;
@@ -50,7 +49,7 @@ use tracing::*;
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Hash, Deserialize)]
 pub struct LawInfo {
   pub num: String,
-  pub chapter: Chapter,
+  pub article: Article,
   pub contents: LawText,
 }
 
@@ -71,7 +70,7 @@ pub struct YomikaeInfo {
   /// 法律番号
   pub num: String,
   /// その読み替え規定がある条項
-  pub chapter: Chapter,
+  pub article: Article,
   /// 読み替えられる前の単語
   pub before_words: Vec<String>,
   /// 読み替えられた後の単語
@@ -85,11 +84,11 @@ pub struct YomikaeInfo {
 pub async fn parse_yomikae(
   law_text: &LawText,
   num: &str,
-  chapter: &Chapter,
+  article: &Article,
 ) -> Result<Vec<YomikaeInfo>, YomikaeError> {
   let law_info = LawInfo {
     num: num.to_string(),
-    chapter: chapter.clone(),
+    article: article.clone(),
     contents: law_text.clone(),
   };
   let input = &law_text.contents;
@@ -155,7 +154,7 @@ pub async fn parse_yomikae(
                     '、' => {
                       let yomikae_info = YomikaeInfo {
                         num: num.to_string(),
-                        chapter: chapter.clone(),
+                        article: article.clone(),
                         before_words: before_words.clone(),
                         after_word: word_in_kakko.clone(),
                       };
@@ -173,7 +172,7 @@ pub async fn parse_yomikae(
                             if let Some('る') = chars_stream.next().await {
                               let yomikae_info = YomikaeInfo {
                                 num: num.to_string(),
-                                chapter: chapter.clone(),
+                                article: article.clone(),
                                 before_words: before_words.clone(),
                                 after_word: word_in_kakko.clone(),
                               };
@@ -192,7 +191,7 @@ pub async fn parse_yomikae(
                       // 終了処理をしてすぐに開始する
                       let yomikae_info = YomikaeInfo {
                         num: num.to_string(),
-                        chapter: chapter.clone(),
+                        article: article.clone(),
                         before_words: before_words.clone(),
                         after_word: word_in_kakko.clone(),
                       };
@@ -238,26 +237,27 @@ pub async fn parse_yomikae(
 #[tokio::test]
 async fn check1() {
   let lawtext = LawText {
-      is_child : false,
+      article_info: Article {
+        article: String::new(),
+        paragraph: None,
+        item: None,
+        sub_item: None,
+        suppl_provision_title: None,
+      },
       contents : LawContents::Text("この場合において、第八百五十一条第四号中「被後見人を代表する」とあるのは、「被保佐人を代表し、又は被保佐人がこれをすることに同意する」と読み替えるものとする。".to_string())
     };
-  let chapter = Chapter {
-    part: None,
-    chapter: None,
-    section: None,
-    subsection: None,
-    division: None,
+  let article = Article {
     article: String::from("test"),
     paragraph: None,
     item: None,
     sub_item: None,
     suppl_provision_title: None,
   };
-  let yomikae_info_lst = parse_yomikae(&lawtext, "test", &chapter).await.unwrap();
+  let yomikae_info_lst = parse_yomikae(&lawtext, "test", &article).await.unwrap();
   assert_eq!(
     vec![YomikaeInfo {
       num: "test".to_string(),
-      chapter: chapter,
+      article: article,
       before_words: vec!["被後見人を代表する".to_string()],
       after_word: "被保佐人を代表し、又は被保佐人がこれをすることに同意する".to_string()
     }],
@@ -268,31 +268,32 @@ async fn check1() {
 #[tokio::test]
 async fn check2() {
   let lawtext = LawText {
-      is_child : false,
+    article_info: Article {
+      article: String::new(),
+      paragraph: None,
+      item: None,
+      sub_item: None,
+      suppl_provision_title: None,
+    },
       contents : LawContents::Text("この場合において、同条中「子ども・子育て支援法（平成二十四年法律第六十五号）第六十九条」とあるのは「平成二十二年度等における子ども手当の支給に関する法律（平成二十二年法律第十九号）第二十条第一項の規定により適用される児童手当法の一部を改正する法律（平成二十四年法律第二十四号）附則第十一条の規定によりなおその効力を有するものとされた同法第一条の規定による改正前の児童手当法（昭和四十六年法律第七十三号）第二十条」と、「子ども・子育て拠出金」とあるのは「子ども手当拠出金」と読み替えるものとする。".to_string())
     };
-  let chapter = Chapter {
-    part: None,
-    chapter: None,
-    section: None,
-    subsection: None,
-    division: None,
+  let article = Article {
     article: String::from("test"),
     paragraph: None,
     item: None,
     sub_item: None,
     suppl_provision_title: None,
   };
-  let yomikae_info_lst = parse_yomikae(&lawtext, "test", &chapter).await.unwrap();
+  let yomikae_info_lst = parse_yomikae(&lawtext, "test", &article).await.unwrap();
   assert_eq!(
     vec![YomikaeInfo {
       num: "test".to_string(),
-      chapter: chapter.clone(),
+      article: article.clone(),
       before_words: vec!["子ども・子育て支援法（平成二十四年法律第六十五号）第六十九条".to_string()],
       after_word: "平成二十二年度等における子ども手当の支給に関する法律（平成二十二年法律第十九号）第二十条第一項の規定により適用される児童手当法の一部を改正する法律（平成二十四年法律第二十四号）附則第十一条の規定によりなおその効力を有するものとされた同法第一条の規定による改正前の児童手当法（昭和四十六年法律第七十三号）第二十条".to_string()
     },YomikaeInfo{
       num:"test".to_string(),
-      chapter: chapter,
+      article: article,
       before_words :vec!["子ども・子育て拠出金".to_string()],
       after_word : "子ども手当拠出金".to_string()
     }],
@@ -303,31 +304,32 @@ async fn check2() {
 #[tokio::test]
 async fn check2_2() {
   let lawtext = LawText {
-      is_child : false,
+    article_info: Article {
+      article: String::new(),
+      paragraph: None,
+      item: None,
+      sub_item: None,
+      suppl_provision_title: None,
+    },
       contents : LawContents::Text("この場合において、同条中「子ども・子育て支援法（平成二十四年法律第六十五号）第六十九条」とあるのは「平成二十二年度等における子ども手当の支給に関する法律（平成二十二年法律第十九号）第二十条第一項の規定により適用される児童手当法の一部を改正する法律（平成二十四年法律第二十四号）附則第十一条の規定によりなおその効力を有するものとされた同法第一条の規定による改正前の児童手当法（昭和四十六年法律第七十三号）第二十条」と「子ども・子育て拠出金」とあるのは「子ども手当拠出金」と読み替えるものとする。".to_string())
     };
-  let chapter = Chapter {
-    part: None,
-    chapter: None,
-    section: None,
-    subsection: None,
-    division: None,
+  let article = Article {
     article: String::from("test"),
     paragraph: None,
     item: None,
     sub_item: None,
     suppl_provision_title: None,
   };
-  let yomikae_info_lst = parse_yomikae(&lawtext, "test", &chapter).await.unwrap();
+  let yomikae_info_lst = parse_yomikae(&lawtext, "test", &article).await.unwrap();
   assert_eq!(
     vec![YomikaeInfo {
       num: "test".to_string(),
-      chapter: chapter.clone(),
+      article: article.clone(),
       before_words: vec!["子ども・子育て支援法（平成二十四年法律第六十五号）第六十九条".to_string()],
       after_word: "平成二十二年度等における子ども手当の支給に関する法律（平成二十二年法律第十九号）第二十条第一項の規定により適用される児童手当法の一部を改正する法律（平成二十四年法律第二十四号）附則第十一条の規定によりなおその効力を有するものとされた同法第一条の規定による改正前の児童手当法（昭和四十六年法律第七十三号）第二十条".to_string()
     },YomikaeInfo{
       num:"test".to_string(),
-      chapter: chapter,
+      article: article,
       before_words :vec!["子ども・子育て拠出金".to_string()],
       after_word : "子ども手当拠出金".to_string()
     }],
@@ -338,26 +340,27 @@ async fn check2_2() {
 #[tokio::test]
 async fn check3() {
   let lawtext = LawText {
-      is_child : false,
+    article_info: Article {
+      article: String::new(),
+      paragraph: None,
+      item: None,
+      sub_item: None,
+      suppl_provision_title: None,
+    },
       contents : LawContents::Text("この場合において、同項中「それぞれ同項各号に定める者」とあり、及び同項第二号中「その者」とあるのは、「都道府県の教育委員会」と読み替えるものとする。".to_string())
     };
-  let chapter = Chapter {
-    part: None,
-    chapter: None,
-    section: None,
-    subsection: None,
-    division: None,
+  let article = Article {
     article: String::from("test"),
     paragraph: None,
     item: None,
     sub_item: None,
     suppl_provision_title: None,
   };
-  let yomikae_info_lst = parse_yomikae(&lawtext, "test", &chapter).await.unwrap();
+  let yomikae_info_lst = parse_yomikae(&lawtext, "test", &article).await.unwrap();
   assert_eq!(
     vec![YomikaeInfo {
       num: "test".to_string(),
-      chapter: chapter,
+      article: article,
       before_words: vec![
         "それぞれ同項各号に定める者".to_string(),
         "その者".to_string()
@@ -371,61 +374,62 @@ async fn check3() {
 #[tokio::test]
 async fn check4() {
   let lawtext = LawText {
-      is_child : false,
+    article_info: Article {
+      article: String::new(),
+      paragraph: None,
+      item: None,
+      sub_item: None,
+      suppl_provision_title: None,
+    },
       contents : LawContents::Text("この場合において、徴収法施行規則第二十七条及び第二十八条中「保険関係が成立した」とあるのは「失業保険法及び労働者災害補償保険法の一部を改正する法律及び労働保険の保険料の徴収等に関する法律の施行に伴う関係法律の整備等に関する法律（昭和四十四年法律第八十五号。以下「整備法」という。）第十八条第一項若しくは第二項、第十八条の二第一項若しくは第二項又は第十八条の三第一項若しくは第二項の規定による保険給付が行なわれることとなつた」と、「保険関係成立の日」とあるのは「当該保険給付が行なわれることとなつた日」と、徴収法施行規則第二十八条第一項中「全期間」とあるのは「整備法第十八条第一項若しくは第二項、第十八条の二第一項若しくは第二項又は第十八条の三第一項若しくは第二項の規定による保険給付が行なわれることとなつた日以後の期間（事業の終了する日前に失業保険法及び労働者災害補償保険法の一部を改正する法律及び労働保険の保険料の徴収等に関する法律の施行に伴う労働省令の整備等に関する省令（昭和四十七年労働省令第九号。以下「整備省令」という。）第八条の期間が経過するときは、その経過する日の前日までの期間）」と、徴収法施行規則第三十二条中「第二十七条から前条まで」とあるのは「第二十七条から第三十条まで」と、「法第十五条から法第十七条まで」とあるのは「法第十五条及び第十六条」と、「その事業の期間」とあるのは「整備法第十八条第一項若しくは第二項、第十八条の二第一項若しくは第二項又は第十八条の三第一項若しくは第二項の規定による保険給付が行なわれることとなつた日以後のその事業の期間（事業の終了する日前に整備省令第八条の期間が経過するときは、その経過する日の前日までの期間）」と読み替えるものとする。".to_string())
     };
-  let chapter = Chapter {
-    part: None,
-    chapter: None,
-    section: None,
-    subsection: None,
-    division: None,
+  let article = Article {
     article: String::from("test"),
     paragraph: None,
     item: None,
     sub_item: None,
     suppl_provision_title: None,
   };
-  let yomikae_info_lst = parse_yomikae(&lawtext, "test", &chapter).await.unwrap();
+  let yomikae_info_lst = parse_yomikae(&lawtext, "test", &article).await.unwrap();
   assert_eq!(
     vec![YomikaeInfo {
       num: "test".to_string(),
-      chapter: chapter.clone(),
+      article: article.clone(),
       before_words: vec![
         "保険関係が成立した".to_string()
       ],
       after_word: "失業保険法及び労働者災害補償保険法の一部を改正する法律及び労働保険の保険料の徴収等に関する法律の施行に伴う関係法律の整備等に関する法律（昭和四十四年法律第八十五号。以下「整備法」という。）第十八条第一項若しくは第二項、第十八条の二第一項若しくは第二項又は第十八条の三第一項若しくは第二項の規定による保険給付が行なわれることとなつた".to_string()
     },YomikaeInfo {
       num: "test".to_string(),
-      chapter: chapter.clone(),
+      article: article.clone(),
       before_words: vec![
         "保険関係成立の日".to_string()
       ],
       after_word: "当該保険給付が行なわれることとなつた日".to_string()
     },YomikaeInfo {
       num: "test".to_string(),
-      chapter: chapter.clone(),
+      article: article.clone(),
       before_words: vec![
         "全期間".to_string()
       ],
       after_word: "整備法第十八条第一項若しくは第二項、第十八条の二第一項若しくは第二項又は第十八条の三第一項若しくは第二項の規定による保険給付が行なわれることとなつた日以後の期間（事業の終了する日前に失業保険法及び労働者災害補償保険法の一部を改正する法律及び労働保険の保険料の徴収等に関する法律の施行に伴う労働省令の整備等に関する省令（昭和四十七年労働省令第九号。以下「整備省令」という。）第八条の期間が経過するときは、その経過する日の前日までの期間）".to_string()
     },YomikaeInfo {
       num: "test".to_string(),
-      chapter: chapter.clone(),
+      article: article.clone(),
       before_words: vec![
         "第二十七条から前条まで".to_string()
       ],
       after_word: "第二十七条から第三十条まで".to_string()
     },YomikaeInfo {
       num: "test".to_string(),
-      chapter: chapter.clone(),
+      article: article.clone(),
       before_words: vec![
         "法第十五条から法第十七条まで".to_string()
       ],
       after_word: "法第十五条及び第十六条".to_string()
     },YomikaeInfo {
       num: "test".to_string(),
-      chapter: chapter.clone(),
+      article: article.clone(),
       before_words: vec![
         "その事業の期間".to_string()
       ],
@@ -438,57 +442,58 @@ async fn check4() {
 #[tokio::test]
 async fn check5() {
   let lawtext = LawText {
-      is_child : false,
+    article_info: Article {
+      article: String::new(),
+      paragraph: None,
+      item: None,
+      sub_item: None,
+      suppl_provision_title: None,
+    },
       contents : LawContents::Text("第百十三条の三十八の規定は、調査員養成研修について準用する。この場合において、同条第一項中「法第六十九条の三十三第一項」とあるのは「令第三十七条の七第一項」と、同項第五号中「前条」とあるのは「第百十三条の三十七」と、同条第二項中「令第三十五条の十六第一項第二号イ」とあるのは「令第三十七条の七第四項第三号イ」と、同条第三項中「令第三十五条の十六第一項第二号ロ」とあるのは「令第三十七条の七第四項第三号ロ」と、同条第四項中「令第三十五条の十六第一項第二号ハ」とあるのは「令第三十七条の七第四項第三号ハ」と「実務研修受講試験の合格年月日並びに研修の受講の開始年月日」とあるのは「研修の受講の開始年月日」と読み替えるものとする。".to_string())
     };
-  let chapter = Chapter {
-    part: None,
-    chapter: None,
-    section: None,
-    subsection: None,
-    division: None,
+  let article = Article {
     article: String::from("test"),
     paragraph: None,
     item: None,
     sub_item: None,
     suppl_provision_title: None,
   };
-  let yomikae_info_lst = parse_yomikae(&lawtext, "test", &chapter).await.unwrap();
+  let yomikae_info_lst = parse_yomikae(&lawtext, "test", &article).await.unwrap();
   assert_eq!(
     vec![
       YomikaeInfo {
         num: "test".to_string(),
-        chapter: chapter.clone(),
+        article: article.clone(),
         before_words: vec!["法第六十九条の三十三第一項".to_string()],
         after_word: "令第三十七条の七第一項".to_string()
       },
       YomikaeInfo {
         num: "test".to_string(),
-        chapter: chapter.clone(),
+        article: article.clone(),
         before_words: vec!["前条".to_string()],
         after_word: "第百十三条の三十七".to_string()
       },
       YomikaeInfo {
         num: "test".to_string(),
-        chapter: chapter.clone(),
+        article: article.clone(),
         before_words: vec!["令第三十五条の十六第一項第二号イ".to_string()],
         after_word: "令第三十七条の七第四項第三号イ".to_string()
       },
       YomikaeInfo {
         num: "test".to_string(),
-        chapter: chapter.clone(),
+        article: article.clone(),
         before_words: vec!["令第三十五条の十六第一項第二号ロ".to_string()],
         after_word: "令第三十七条の七第四項第三号ロ".to_string()
       },
       YomikaeInfo {
         num: "test".to_string(),
-        chapter: chapter.clone(),
+        article: article.clone(),
         before_words: vec!["令第三十五条の十六第一項第二号ハ".to_string()],
         after_word: "令第三十七条の七第四項第三号ハ".to_string()
       },
       YomikaeInfo {
         num: "test".to_string(),
-        chapter: chapter.clone(),
+        article: article.clone(),
         before_words: vec!["実務研修受講試験の合格年月日並びに研修の受講の開始年月日".to_string()],
         after_word: "研修の受講の開始年月日".to_string()
       }

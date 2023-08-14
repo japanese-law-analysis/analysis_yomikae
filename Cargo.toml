@@ -26,8 +26,8 @@ tokio = { version = "1.22.0", features = ["full"] }
 anyhow = "1.0.66"
 tracing-subscriber = { version = "0.3.16", features = ["registry"]}
 listup_law = { git="https://github.com/japanese-law-analysis/listup_law.git", rev="361e52a"}
-#jplaw_text = { git="https://github.com/japanese-law-analysis/jplaw_text.git", tag="0.2.0" }
-jplaw_text = { git="https://github.com/japanese-law-analysis/jplaw_text.git", rev="ecdbbc5" }
+jplaw_text = { git="https://github.com/japanese-law-analysis/jplaw_text.git", tag="0.4.0" }
+#jplaw_text = { git="https://github.com/japanese-law-analysis/jplaw_text.git", rev="84135d3" }
 search_article_with_word = { git="https://github.com/japanese-law-analysis/search_article_with_word.git", rev="578feec"}
 thiserror = "1.0.37"
 

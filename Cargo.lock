@@ -290,8 +290,8 @@ checksum = "4217ad341ebadf8d8e724e264f13e593e0648f5b3e94b3896a5df283be015ecc"
 
 [[package]]
 name = "jplaw_text"
-version = "0.2.0"
-source = "git+https://github.com/japanese-law-analysis/jplaw_text.git?rev=ecdbbc5#ecdbbc5fbf949b8c622eb4fa989aaed04200a5e1"
+version = "0.4.0"
+source = "git+https://github.com/japanese-law-analysis/jplaw_text.git?tag=0.4.0#84135d3cc69bd0166a3ff6130125e17200e7dc6e"
 dependencies = [
  "encoding_rs",
  "quick-xml",
