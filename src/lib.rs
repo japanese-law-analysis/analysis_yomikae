@@ -45,6 +45,8 @@ use thiserror::Error;
 use tokio_stream::StreamExt;
 use tracing::*;
 
+use crate::auto_fix_paren::auto_fix_paren;
+
 pub mod auto_fix_paren;
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Hash, Deserialize)]
@@ -102,6 +104,100 @@ pub async fn parse_yomikae(
     LawContents::Text(input) => {
       info!("[INPUT] {num} : {:?}", input);
 
+      let mut yomikae_info_lst = Vec::new();
+
+      // 角括弧の中にある文字
+      let mut word_in_kakko = String::new();
+
+      let mut before_words = Vec::new();
+      let mut is_before_words_end = false;
+
+      if let Some(text_lst) = auto_fix_paren(input).await {
+        for (i, s) in text_lst.iter().enumerate() {
+          if i % 2 == 1 {
+            let chars = s.chars().collect::<Vec<_>>();
+            // 前後にある鉤括弧を削除
+            let w = &chars[1..chars.len() - 1].iter().collect::<String>();
+            word_in_kakko = w.clone();
+          } else {
+            // 「と読み替える」 => yomikae_info_lstに追加し初期化
+            // 「とあり」     => before_wordsに追加
+            // 「とある」     => before_wordsに追加し、そこで打ち止め
+            // 「と、」       => after_wordにし、yomikae_info_lstに追加し初期化
+            // 「と「」         => 「と、」と基本同じ
+            // それ以外         => すべて初期化
+            let chars = s.chars().collect::<Vec<_>>();
+            if chars.len() == 1 && chars[0] == 'と' {
+              // 「と「」のパターン
+              let yomikae_info = YomikaeInfo {
+                before_words: before_words.clone(),
+                after_word: word_in_kakko.clone(),
+              };
+              if !before_words.is_empty() && !word_in_kakko.is_empty() {
+                yomikae_info_lst.push(yomikae_info);
+              }
+              word_in_kakko = String::new();
+              is_before_words_end = false;
+              before_words = vec![];
+            } else {
+              match (
+                chars.first(),
+                chars.get(1),
+                chars.get(2),
+                chars.get(3),
+                chars.get(4),
+                chars.get(5),
+              ) {
+                (Some('と'), Some('読'), Some('み'), Some('替'), Some('え'), Some('る')) => {
+                  let yomikae_info = YomikaeInfo {
+                    before_words: before_words.clone(),
+                    after_word: word_in_kakko.clone(),
+                  };
+                  if !before_words.is_empty() && !word_in_kakko.is_empty() {
+                    yomikae_info_lst.push(yomikae_info);
+                  }
+                  word_in_kakko = String::new();
+                  is_before_words_end = false;
+                  before_words = vec![];
+                }
+                (Some('と'), Some('あ'), Some('り'), _, _, _) => {
+                  if is_before_words_end {
+                    return Err(YomikaeError::UnexpectedParallelWords(law_info));
+                  }
+                  before_words.push(word_in_kakko);
+                  word_in_kakko = String::new();
+                  is_before_words_end = false;
+                }
+                (Some('と'), Some('あ'), Some('る'), _, _, _) => {
+                  before_words.push(word_in_kakko);
+                  word_in_kakko = String::new();
+                  is_before_words_end = true;
+                }
+                (Some('と'), Some('、'), _, _, _, _) => {
+                  let yomikae_info = YomikaeInfo {
+                    before_words: before_words.clone(),
+                    after_word: word_in_kakko.clone(),
+                  };
+                  if !before_words.is_empty() && !word_in_kakko.is_empty() {
+                    yomikae_info_lst.push(yomikae_info);
+                  }
+                  word_in_kakko = String::new();
+                  is_before_words_end = false;
+                  before_words = vec![];
+                }
+                _ => {
+                  // それ以外なので初期化
+                  word_in_kakko = String::new();
+                  is_before_words_end = false;
+                  before_words = vec![];
+                }
+              }
+            }
+          }
+        }
+      }
+
+      /*
       let mut chars_stream = tokio_stream::iter(input.chars());
 
       let mut yomikae_info_lst = Vec::new();
@@ -226,6 +322,7 @@ pub async fn parse_yomikae(
           }
         }
       }
+      */
 
       Ok(yomikae_info_lst)
     }
