@@ -24,7 +24,7 @@ pub struct SplitPattern {
 
 /// 改め文や読み替え規定文に出現するカギカッコ付きの文章を、
 /// 開きカギカッコと閉じカギカッコの非対応があっても分割する関数
-pub async fn auto_fix_paren(text: &str) -> Vec<String> {
+pub async fn auto_fix_paren(text: &str) -> Option<Vec<String>> {
   let mut paren_info_lst = Vec::new();
   for (i, c) in text.chars().enumerate() {
     match c {
@@ -76,8 +76,8 @@ pub async fn auto_fix_paren(text: &str) -> Vec<String> {
           now_head -= split_pattern.pattern_lst[split_pattern.now] * 2;
         }
       } else {
-        // 先頭に戻る
-        now_head = 0;
+        // 分割位置が定まらないためその旨を返す
+        return None;
       }
     } else {
       let n = pattern_lst[0];
@@ -111,13 +111,13 @@ pub async fn auto_fix_paren(text: &str) -> Vec<String> {
   }
   let s = &chars[char_pos..].iter().collect::<String>();
   v.push(s.clone());
-  v
+  Some(v)
 }
 
 #[tokio::test]
 async fn check_auto_fix_paren1() {
   assert_eq!(
-    auto_fix_paren("あ「い」う「え」お").await,
+    auto_fix_paren("あ「い」う「え」お").await.unwrap(),
     vec![
       "あ".to_string(),
       "「い」".to_string(),
@@ -131,7 +131,7 @@ async fn check_auto_fix_paren1() {
 #[tokio::test]
 async fn check_auto_fix_paren2() {
   assert_eq!(
-    auto_fix_paren("あ「い」」う「え」」お").await,
+    auto_fix_paren("あ「い」」う「え」」お").await.unwrap(),
     vec![
       "あ".to_string(),
       "「い」」".to_string(),
@@ -145,7 +145,7 @@ async fn check_auto_fix_paren2() {
 #[tokio::test]
 async fn check_auto_fix_paren3() {
   assert_eq!(
-    auto_fix_paren("あ「「い」う「「え」お").await,
+    auto_fix_paren("あ「「い」う「「え」お").await.unwrap(),
     vec![
       "あ".to_string(),
       "「「い」".to_string(),
@@ -159,7 +159,9 @@ async fn check_auto_fix_paren3() {
 #[tokio::test]
 async fn check_auto_fix_paren4() {
   assert_eq!(
-    auto_fix_paren("あ「い」う」え」お「か」き」く」け").await,
+    auto_fix_paren("あ「い」う」え」お「か」き」く」け")
+      .await
+      .unwrap(),
     vec![
       "あ".to_string(),
       "「い」う」え」".to_string(),
@@ -173,7 +175,9 @@ async fn check_auto_fix_paren4() {
 #[tokio::test]
 async fn check_auto_fix_paren5() {
   assert_eq!(
-    auto_fix_paren("あ「た」ち「つ」て」と「な」に「ぬ」ね」の").await,
+    auto_fix_paren("あ「た」ち「つ」て」と「な」に「ぬ」ね」の")
+      .await
+      .unwrap(),
     vec![
       "あ".to_string(),
       "「た」ち「つ」て」".to_string(),
@@ -187,7 +191,9 @@ async fn check_auto_fix_paren5() {
 #[tokio::test]
 async fn check_auto_fix_paren6() {
   assert_eq!(
-    auto_fix_paren("あ「い」」う「え」」お「か「き」く」け」こ「さ「し」す」せ」そ「た」ち「つ」て」と「な」に「ぬ」ね」の").await,
+    auto_fix_paren("あ「い」」う「え」」お「か「き」く」け」こ「さ「し」す」せ」そ「た」ち「つ」て」と「な」に「ぬ」ね」の")
+      .await
+      .unwrap(),
     vec![
       "あ".to_string(),
       "「い」」".to_string(),
