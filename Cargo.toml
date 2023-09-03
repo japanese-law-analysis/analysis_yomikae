@@ -30,4 +30,5 @@ jplaw_text = { git="https://github.com/japanese-law-analysis/jplaw_text.git", ta
 #jplaw_text = { git="https://github.com/japanese-law-analysis/jplaw_text.git", rev="84135d3" }
 search_article_with_word = { git="https://github.com/japanese-law-analysis/search_article_with_word.git", rev="578feec"}
 thiserror = "1.0.37"
+async-recursion = "1.0.5"
 
