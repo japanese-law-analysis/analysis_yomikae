@@ -16,26 +16,6 @@ pub struct ParenInfo {
   v: Paren,
 }
 
-/// 分割位置の候補の情報。
-/// 「何文字で何回分割するのか」を保持する。
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct SplitPattern {
-  /// 何文字で分割するか
-  len: usize,
-  /// 何回使うか
-  times: usize,
-}
-
-/// 分割位置の候補の情報。
-/// 「何文字で分割するのか」を保持する。
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct SplitPatternList {
-  /// 現在採用している候補
-  now: usize,
-  /// 何文字で分割するのか、の候補
-  pattern_lst: Vec<SplitPattern>,
-}
-
 /// 解析のために一時的に使うトークン
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ParseToken {
@@ -65,12 +45,9 @@ pub async fn auto_fix_paren(text: &str) -> Option<Vec<String>> {
   loop {
     match token_iter.next() {
       Some(ParseToken::KagiOpen(pos)) => {
-        match token_iter.peek() {
-          Some(ParseToken::MaruClose) => {
-            token_iter.next();
-          }
-          _ => (),
-        };
+        if let Some(ParseToken::MaruClose) = token_iter.peek() {
+          token_iter.next();
+        }
         if maru_paren_depth == 0 {
           paren_info_lst.push(ParenInfo {
             pos: *pos,
@@ -98,126 +75,48 @@ pub async fn auto_fix_paren(text: &str) -> Option<Vec<String>> {
       None => break,
     }
   }
-  println!("paren_info_lst: {paren_info_lst:?}");
 
   // あり得る分割パターンを生成し、評価関数によって一番適当そうなものを採用する
   // ただし、愚直に括弧間で分割できる・できないで生成すると2^(n - 1)個生成されてしまう
   // そこで「分割可能位置は開き鍵括弧と閉じ鉤括弧がこの順で隣り合っている箇所」
   // という制約を加えることで枝刈りを行う
-  let split_point_lst = generate_split_pattern(&paren_info_lst).await;
-
-  let mut now_head: usize = 0;
-  let mut pattern: Vec<SplitPatternList> = Vec::new();
-  while now_head < paren_info_lst.len() {
-    // 最短の取得を許される最大の回数から取っていくようにする
-    // 典型的なパターンでは最速で終わり、込み入った例外パターンではより多様な選択を検証できる
-    let len_max = (paren_info_lst.len() - now_head) / 2;
-    let mut pattern_lst = Vec::new();
-    for len in 2..=len_max {
-      let mut max_times = None;
-      for times in (2..=((paren_info_lst.len() - now_head) / len)).rev() {
-        if max_times.is_none() {
-          let paren_lst_lst = (1..=times)
-            .map(|n| {
-              let pos_start = now_head + len * (n - 1);
-              let pos_end = now_head + len * n - 1;
-              let v = &paren_info_lst[pos_start..=pos_end]
-                .iter()
-                .map(|info| info.clone().v)
-                .collect::<Vec<_>>();
-              v.clone()
-            })
-            .collect::<Vec<_>>();
-          let head = &paren_lst_lst[0];
-          if paren_lst_lst.iter().all(|paren_lst| {
-            paren_lst == head
-              && paren_lst[0] == Paren::Open
-              && paren_lst[paren_lst.len() - 1] == Paren::Close
-          }) {
-            max_times = Some(times);
-          }
+  generate_split_pattern(&paren_info_lst)
+    .await
+    .iter()
+    .map(|l| (eval(l), l))
+    .max_by_key(|(v, _)| *v)
+    .map(|(_, split_pattern)| {
+      let mut v = Vec::new();
+      let chars = text.chars().collect::<Vec<_>>();
+      let mut pos = 0;
+      for l in split_pattern.iter() {
+        if !l.is_empty() {
+          let start = l[0].pos;
+          let end = l[l.len() - 1].pos;
+          let s1 = &chars[pos..start].iter().collect::<String>();
+          let s2 = &chars[start..=end].iter().collect::<String>();
+          pos = end + 1;
+          v.push(s1.clone());
+          v.push(s2.clone());
         }
       }
-      if let Some(max_times) = max_times {
-        let mut l = (2..=max_times)
-          .rev()
-          .map(|times| SplitPattern { len, times })
-          .collect::<Vec<_>>();
-        pattern_lst.append(&mut l);
-      }
-    }
-
-    if pattern_lst.is_empty() {
-      // 次の分割候補がないのでトラックバックする
-      if let Some(split_pattern) = pattern.pop() {
-        if split_pattern.now < split_pattern.pattern_lst.len() - 1 {
-          now_head -= split_pattern.pattern_lst[split_pattern.now].len
-            * split_pattern.pattern_lst[split_pattern.now].times;
-          now_head += split_pattern.pattern_lst[split_pattern.now + 1].len
-            * split_pattern.pattern_lst[split_pattern.now + 1].times;
-          pattern.push(SplitPatternList {
-            now: split_pattern.now + 1,
-            pattern_lst: split_pattern.pattern_lst,
-          })
-        } else {
-          now_head -= split_pattern.pattern_lst[split_pattern.now].len
-            * split_pattern.pattern_lst[split_pattern.now].times;
-        }
-      } else {
-        // 分割位置が定まらないためその旨を返す
-        return None;
-      }
-    } else {
-      // 分割できたので加える
-      let len = pattern_lst[0].len;
-      let n = pattern_lst[0].times;
-      now_head += len * n;
-      pattern.push(SplitPatternList {
-        now: 0,
-        pattern_lst,
-      });
-    }
-  }
-
-  let mut v = Vec::new();
-  let mut paren_pos = 0;
-  let mut char_pos = 0;
-  let chars = text.chars().collect::<Vec<_>>();
-  for SplitPatternList { now, pattern_lst } in pattern.iter() {
-    let len = pattern_lst[*now].len;
-    let times = pattern_lst[*now].times;
-    for n in 1..=times {
-      let start = paren_info_lst[paren_pos + len * (n - 1)].pos;
-      let end = paren_info_lst[paren_pos + (len * n) - 1].pos;
-      let s1 = &chars[char_pos..start].iter().collect::<String>();
-      let s2 = &chars[start..=end].iter().collect::<String>();
-      char_pos = end + 1;
-      v.push(s1.clone());
-      v.push(s2.clone());
-    }
-    paren_pos += len * times;
-  }
-  let s = &chars[char_pos..].iter().collect::<String>();
-  v.push(s.clone());
-  Some(v)
+      let s = &chars[pos..].iter().collect::<String>();
+      v.push(s.clone());
+      v
+    })
 }
 
-// 「分割可能位置は開き鍵括弧と閉じ鉤括弧がこの順で隣り合っている箇所」
-// という制約のもと括弧列を分割することができる次の箇所のリストを生成する関数
+/// 「分割可能位置は開き鍵括弧と閉じ鉤括弧がこの順で隣り合っている箇所」
+/// という制約のもと括弧列を分割することができる次の箇所のリストを生成する関数
 #[async_recursion]
 async fn generate_split_pattern(lst: &[ParenInfo]) -> HashSet<Vec<Vec<ParenInfo>>> {
   let mut next_lst = Vec::new();
   let mut l = lst.clone().iter().enumerate().peekable();
-  loop {
-    match l.next() {
-      Some((i, info)) => {
-        if Paren::Close == info.v {
-          if let Some((_, ParenInfo { v: Paren::Open, .. })) = l.peek() {
-            next_lst.push(i)
-          }
-        }
+  while let Some((i, info)) = l.next() {
+    if Paren::Close == info.v {
+      if let Some((_, ParenInfo { v: Paren::Open, .. })) = l.peek() {
+        next_lst.push(i)
       }
-      _ => break,
     }
   }
   next_lst.push(lst.len() - 1);
@@ -226,7 +125,6 @@ async fn generate_split_pattern(lst: &[ParenInfo]) -> HashSet<Vec<Vec<ParenInfo>
   let mut set = HashSet::new();
   while let Some(next_pos) = next_lst_stream.next().await {
     if next_pos != lst.len() - 1 {
-      println!("lst: {lst:?}, next_pos: {next_pos}");
       let l1 = &lst[0..=next_pos];
       let l2 = &lst[next_pos + 1..];
       generate_split_pattern(l2).await.iter().for_each(|v| {
@@ -295,6 +193,25 @@ async fn check_generate_split_pattern_2() {
     .collect::<Vec<_>>();
   // 2^7 = 128
   assert_eq!(generate_split_pattern(&v).await.len(), 128)
+}
+
+/// 括弧の分割パターンを評価して点数付を行う関数
+/// 評価項目はこんな感じ
+/// - 分割が細かいほどよい
+/// - 同じ分割パターンがまとめて出現しているとポイントが高い
+fn eval(lst: &[Vec<ParenInfo>]) -> usize {
+  let mut point = lst.len();
+  let mut l1 = lst.clone().iter().peekable();
+  while let Some(p1) = l1.next() {
+    if let Some(p2) = l1.peek() {
+      let p1 = p1.iter().map(|p| &p.v).collect::<Vec<_>>();
+      let p2 = p2.iter().map(|p| &p.v).collect::<Vec<_>>();
+      if p1 == p2 {
+        point += lst.len() * 10
+      }
+    }
+  }
+  point
 }
 
 #[tokio::test]
@@ -469,7 +386,6 @@ async fn check_auto_fix_paren10() {
   );
 }
 
-/*
 #[tokio::test]
 async fn check_auto_fix_paren11() {
   assert_eq!(
@@ -486,8 +402,7 @@ async fn check_auto_fix_paren11() {
       "く".to_string()
     ]
   );
-
-*/
+}
 
 // あ「い」う「（（え））」お「か」き「く」け「こ「さ」「し「す」せ「（（そ））」た」ち「つ」「（（て））」と「な」に「（ぬ）」ね「の」は「ひ」ふ「へ」ほ「（ま）」み「む」め「も」」ら「り」る
 

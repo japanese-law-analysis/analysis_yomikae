@@ -82,7 +82,7 @@ async fn main() -> Result<()> {
                 // カッコではない箇所に「と読み替える」が出現していることが求められる。
                 s.contains("と読み替える")
               } else {
-                true
+                i != 0
               }
             }) {
               if text_list.iter().enumerate().all(|(i, s)| {
