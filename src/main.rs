@@ -76,29 +76,32 @@ async fn main() -> Result<()> {
       match &law_text.contents {
         LawContents::Text(s) => {
           info!("text: {s}");
-          if let Some(text_list) = auto_fix_paren::auto_fix_paren(s).await {
-            if text_list.iter().enumerate().all(|(i, s)| {
-              if i % 2 == 1 {
-                // カッコではない箇所に「と読み替える」が出現していることが求められる。
-                s.contains("と読み替える")
-              } else {
-                i != 0
+          //let text_list = auto_fix_paren::auto_fix_paren(s).await;
+          if s.contains("と読み替える")
+          /*text_list.iter().enumerate().all(|(i, s)| {
+            if i % 2 == 0 {
+              // カッコではない箇所に「と読み替える」が出現していることが求められる。
+              s.contains("と読み替える")
+            } else {
+              i != 0
+            }
+          }) */
+          {
+            if
+            /*text_list.iter().enumerate().all(|(i, s)| {
+            if i % 2 == 1 {*/
+            s.contains("下欄に掲げる字句と読み替える")
+              || s.contains("下欄の字句と読み替える")
+              || s.contains("下欄に掲げる日又は月と読み替える")
+            /*} else {
+                true
               }
-            }) {
-              if text_list.iter().enumerate().all(|(i, s)| {
-                if i % 2 == 1 {
-                  s.contains("下欄に掲げる字句と読み替える")
-                    || s.contains("下欄の字句と読み替える")
-                    || s.contains("下欄に掲げる日又は月と読み替える")
-                } else {
-                  true
-                }
-              }) {
-                is_yomikae_table = Some(law_text.article_info);
-              } else {
-                yomikae_law_text_lst.push(law_text);
-                is_yomikae_table = None;
-              }
+            }) */
+            {
+              is_yomikae_table = Some(law_text.article_info);
+            } else {
+              yomikae_law_text_lst.push(law_text);
+              is_yomikae_table = None;
             }
           }
         }

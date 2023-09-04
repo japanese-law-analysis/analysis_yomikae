@@ -1,5 +1,4 @@
 use async_recursion::async_recursion;
-use std::collections::HashSet;
 use tokio_stream::StreamExt;
 
 /// カギカッコの種類
@@ -27,7 +26,7 @@ pub enum ParseToken {
 
 /// 改め文や読み替え規定文に出現するカギカッコ付きの文章を、
 /// 開きカギカッコと閉じカギカッコの非対応があっても分割する関数
-pub async fn auto_fix_paren(text: &str) -> Option<Vec<String>> {
+pub async fn auto_fix_paren(text: &str) -> Vec<String> {
   // 文字列から括弧類だけを抽出し、丸括弧内の鉤括弧を排除して構造を簡略化する操作
   let mut dump_paren_lst = Vec::new();
   for (i, c) in text.chars().peekable().enumerate() {
@@ -39,9 +38,10 @@ pub async fn auto_fix_paren(text: &str) -> Option<Vec<String>> {
       _ => (),
     }
   }
-  let mut maru_paren_depth = 0;
+  let mut maru_paren_depth: isize = 0;
   let mut paren_info_lst = Vec::new();
   let mut token_iter = dump_paren_lst.iter().peekable();
+  let mut paren_diff: isize = 0;
   loop {
     match token_iter.next() {
       Some(ParseToken::KagiOpen(pos)) => {
@@ -49,6 +49,7 @@ pub async fn auto_fix_paren(text: &str) -> Option<Vec<String>> {
           token_iter.next();
         }
         if maru_paren_depth == 0 {
+          paren_diff += 1;
           paren_info_lst.push(ParenInfo {
             pos: *pos,
             v: Paren::Open,
@@ -57,6 +58,7 @@ pub async fn auto_fix_paren(text: &str) -> Option<Vec<String>> {
       }
       Some(ParseToken::KagiClose(pos)) => {
         if maru_paren_depth == 0 {
+          paren_diff -= 1;
           paren_info_lst.push(ParenInfo {
             pos: *pos,
             v: Paren::Close,
@@ -76,70 +78,118 @@ pub async fn auto_fix_paren(text: &str) -> Option<Vec<String>> {
     }
   }
 
-  // あり得る分割パターンを生成し、評価関数によって一番適当そうなものを採用する
-  // ただし、愚直に括弧間で分割できる・できないで生成すると2^(n - 1)個生成されてしまう
-  // そこで「分割可能位置は開き鍵括弧と閉じ鉤括弧がこの順で隣り合っている箇所」
-  // という制約を加えることで枝刈りを行う
-  generate_split_pattern(&paren_info_lst)
-    .await
-    .iter()
-    .map(|l| (eval(l), l))
-    .max_by_key(|(v, _)| *v)
-    .map(|(_, split_pattern)| {
-      let mut v = Vec::new();
-      let chars = text.chars().collect::<Vec<_>>();
-      let mut pos = 0;
-      for l in split_pattern.iter() {
-        if !l.is_empty() {
-          let start = l[0].pos;
-          let end = l[l.len() - 1].pos;
+  if paren_diff == 0 {
+    let mut v = Vec::new();
+    let mut l = paren_info_lst.iter().peekable();
+    let mut pos = 0;
+    let chars = text.chars().collect::<Vec<_>>();
+    while let Some(info) = l.next() {
+      if Paren::Close == info.v {
+        if let Some(ParenInfo {
+          v: Paren::Open,
+          pos: end,
+        }) = l.peek()
+        {
+          let start = info.pos;
           let s1 = &chars[pos..start].iter().collect::<String>();
-          let s2 = &chars[start..=end].iter().collect::<String>();
+          let s2 = &chars[start..*end].iter().collect::<String>();
           pos = end + 1;
           v.push(s1.clone());
           v.push(s2.clone());
         }
       }
-      let s = &chars[pos..].iter().collect::<String>();
-      v.push(s.clone());
-      v
-    })
+    }
+    let s = &chars[pos..].iter().collect::<String>();
+    v.push(s.clone());
+    v
+  } else {
+    // 開きと閉じに差があるときのみに分割を考慮する
+    // あり得る分割パターンを生成し、評価関数によって一番適当そうなものを採用する
+    // ただし、愚直に括弧間で分割できる・できないで生成すると2^(n - 1)個生成されてしまう
+    // そこで「分割可能位置は開き鍵括弧と閉じ鉤括弧がこの順で隣り合っている箇所」
+    // という制約を加えることで枝刈りを行う
+    generate_split_pattern(&paren_info_lst)
+      .await
+      .iter()
+      .map(|l| (eval(l), l))
+      .max_by_key(|(v, _)| *v)
+      .map(|(_, split_pattern)| {
+        let mut v = Vec::new();
+        let chars = text.chars().collect::<Vec<_>>();
+        let mut pos = 0;
+        for l in split_pattern.iter() {
+          if !l.is_empty() {
+            let start = l[0].pos;
+            let end = l[l.len() - 1].pos;
+            let s1 = &chars[pos..start].iter().collect::<String>();
+            let s2 = &chars[start..=end].iter().collect::<String>();
+            pos = end + 1;
+            v.push(s1.clone());
+            v.push(s2.clone());
+          }
+        }
+        let s = &chars[pos..].iter().collect::<String>();
+        v.push(s.clone());
+        v
+      })
+      .unwrap()
+  }
 }
 
 /// 「分割可能位置は開き鍵括弧と閉じ鉤括弧がこの順で隣り合っている箇所」
 /// という制約のもと括弧列を分割することができる次の箇所のリストを生成する関数
 #[async_recursion]
-async fn generate_split_pattern(lst: &[ParenInfo]) -> HashSet<Vec<Vec<ParenInfo>>> {
+async fn generate_split_pattern(lst: &[ParenInfo]) -> Vec<Vec<Vec<ParenInfo>>> {
   let mut next_lst = Vec::new();
   let mut l = lst.clone().iter().enumerate().peekable();
   while let Some((i, info)) = l.next() {
-    if Paren::Close == info.v {
+    if lst.len() / 3 < i && lst.len() < 6 {
+      // 適切なトークン量ならば、
+      // 適切な分割箇所は前半1/3までには現れるだろう、という雑なマジックナンバー
+      break;
+    } else if Paren::Close == info.v {
       if let Some((_, ParenInfo { v: Paren::Open, .. })) = l.peek() {
         next_lst.push(i)
       }
     }
   }
   next_lst.push(lst.len() - 1);
+  //info!("size: {}", next_lst.len());
 
   let mut next_lst_stream = tokio_stream::iter(next_lst);
-  let mut set = HashSet::new();
+  let mut result = Vec::new();
   while let Some(next_pos) = next_lst_stream.next().await {
     if next_pos != lst.len() - 1 {
-      let l1 = &lst[0..=next_pos];
+      let l1 = &lst[0..=next_pos].to_vec();
       let l2 = &lst[next_pos + 1..];
-      generate_split_pattern(l2).await.iter().for_each(|v| {
-        let mut l = vec![l1.to_vec()];
-        let mut v = v.clone();
-        l.append(&mut v);
-        set.insert(l);
-      });
+      generate_split_pattern(l2)
+        .await
+        .iter()
+        .for_each(|children| {
+          let mut l1 = vec![l1.clone()];
+          let mut children = children.clone();
+          l1.append(&mut children);
+          result.push(l1);
+        });
     } else {
-      set.insert(vec![lst.to_vec()]);
+      result.push(vec![lst.to_vec()]);
     }
   }
-  set
+  let mut l = result
+    .iter()
+    .map(|v| (eval(v), v.clone()))
+    .collect::<Vec<_>>();
+  l.sort_by(|(pt1, _), (pt2, _)| pt2.cmp(pt1));
+  // 4つくらい候補を残して枝刈りしておけばいいだろう、というマジックナンバー
+  // 検証する必要がある
+  let take_size = 4;
+  l.iter()
+    .take(take_size)
+    .map(|(_, v)| v.clone())
+    .collect::<Vec<_>>()
 }
 
+/*
 #[tokio::test]
 async fn check_generate_split_pattern_1() {
   let v = vec![Paren::Open, Paren::Close, Paren::Open, Paren::Close];
@@ -194,6 +244,7 @@ async fn check_generate_split_pattern_2() {
   // 2^7 = 128
   assert_eq!(generate_split_pattern(&v).await.len(), 128)
 }
+*/
 
 /// 括弧の分割パターンを評価して点数付を行う関数
 /// 評価項目はこんな感じ
@@ -207,7 +258,7 @@ fn eval(lst: &[Vec<ParenInfo>]) -> usize {
       let p1 = p1.iter().map(|p| &p.v).collect::<Vec<_>>();
       let p2 = p2.iter().map(|p| &p.v).collect::<Vec<_>>();
       if p1 == p2 {
-        point += lst.len() * 10
+        point += lst.len() * 100
       }
     }
   }
@@ -217,7 +268,7 @@ fn eval(lst: &[Vec<ParenInfo>]) -> usize {
 #[tokio::test]
 async fn check_auto_fix_paren1() {
   assert_eq!(
-    auto_fix_paren("あ「い」う「え」お").await.unwrap(),
+    auto_fix_paren("あ「い」う「え」お").await,
     vec![
       "あ".to_string(),
       "「い」".to_string(),
@@ -231,7 +282,7 @@ async fn check_auto_fix_paren1() {
 #[tokio::test]
 async fn check_auto_fix_paren2() {
   assert_eq!(
-    auto_fix_paren("あ「い」」う「え」」お").await.unwrap(),
+    auto_fix_paren("あ「い」」う「え」」お").await,
     vec![
       "あ".to_string(),
       "「い」」".to_string(),
@@ -245,7 +296,7 @@ async fn check_auto_fix_paren2() {
 #[tokio::test]
 async fn check_auto_fix_paren3() {
   assert_eq!(
-    auto_fix_paren("あ「「い」う「「え」お").await.unwrap(),
+    auto_fix_paren("あ「「い」う「「え」お").await,
     vec![
       "あ".to_string(),
       "「「い」".to_string(),
@@ -259,9 +310,7 @@ async fn check_auto_fix_paren3() {
 #[tokio::test]
 async fn check_auto_fix_paren4() {
   assert_eq!(
-    auto_fix_paren("あ「い」う」え」お「か」き」く」け")
-      .await
-      .unwrap(),
+    auto_fix_paren("あ「い」う」え」お「か」き」く」け").await,
     vec![
       "あ".to_string(),
       "「い」う」え」".to_string(),
@@ -275,9 +324,7 @@ async fn check_auto_fix_paren4() {
 #[tokio::test]
 async fn check_auto_fix_paren5() {
   assert_eq!(
-    auto_fix_paren("あ「た」ち「つ」て」と「な」に「ぬ」ね」の")
-      .await
-      .unwrap(),
+    auto_fix_paren("あ「た」ち「つ」て」と「な」に「ぬ」ね」の").await,
     vec![
       "あ".to_string(),
       "「た」ち「つ」て」".to_string(),
@@ -293,7 +340,7 @@ async fn check_auto_fix_paren6() {
   assert_eq!(
     auto_fix_paren("あ「い」」う「え」」お「か「き」く」け」こ「さ「し」す」せ」そ「た」ち「つ」て」と「な」に「ぬ」ね」の")
       .await
-      .unwrap(),
+      ,
     vec![
       "あ".to_string(),
       "「い」」".to_string(),
@@ -315,9 +362,7 @@ async fn check_auto_fix_paren6() {
 #[tokio::test]
 async fn check_auto_fix_paren7() {
   assert_eq!(
-    auto_fix_paren("あ「い」」う「え」」お「か」」き「く」け「こ」さ")
-      .await
-      .unwrap(),
+    auto_fix_paren("あ「い」」う「え」」お「か」」き「く」け「こ」さ").await,
     vec![
       "あ".to_string(),
       "「い」」".to_string(),
@@ -337,9 +382,7 @@ async fn check_auto_fix_paren7() {
 #[tokio::test]
 async fn check_auto_fix_paren8() {
   assert_eq!(
-    auto_fix_paren("あ「い」」う「え」」お「か」」き")
-      .await
-      .unwrap(),
+    auto_fix_paren("あ「い」」う「え」」お「か」」き").await,
     vec![
       "あ".to_string(),
       "「い」」".to_string(),
@@ -355,9 +398,7 @@ async fn check_auto_fix_paren8() {
 #[tokio::test]
 async fn check_auto_fix_paren9() {
   assert_eq!(
-    auto_fix_paren("あ「い」う「え（「お」）か」き")
-      .await
-      .unwrap(),
+    auto_fix_paren("あ「い」う「え（「お」）か」き").await,
     vec![
       "あ".to_string(),
       "「い」".to_string(),
@@ -371,9 +412,7 @@ async fn check_auto_fix_paren9() {
 #[tokio::test]
 async fn check_auto_fix_paren10() {
   assert_eq!(
-    auto_fix_paren("あ「い」う「え（」お「か（」き")
-      .await
-      .unwrap(),
+    auto_fix_paren("あ「い」う「え（」お「か（」き").await,
     vec![
       "あ".to_string(),
       "「い」".to_string(),
@@ -389,9 +428,7 @@ async fn check_auto_fix_paren10() {
 #[tokio::test]
 async fn check_auto_fix_paren11() {
   assert_eq!(
-    auto_fix_paren("あ「い」う「え」」お「か「き」」」く")
-      .await
-      .unwrap(),
+    auto_fix_paren("あ「い」う「え」」お「か「き」」」く").await,
     vec![
       "あ".to_string(),
       "「い」".to_string(),
